@@ -3,6 +3,7 @@ make_lib_vec <- function() {
     "targets",
     "tidyverse",
     "lubridate",
-    "qs"
+    "qs",
+    "fastDummies"
   )
 }
