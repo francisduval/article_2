@@ -7,6 +7,7 @@ make_lib_vec <- function() {
     "qs",
     "fastDummies",
     "here",
-    "dtplyr"
+    "dtplyr",
+    "hms"
   )
 }
