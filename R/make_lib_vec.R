@@ -6,6 +6,7 @@ make_lib_vec <- function() {
     "lubridate",
     "qs",
     "fastDummies",
-    "here"
+    "here",
+    "dtplyr"
   )
 }
