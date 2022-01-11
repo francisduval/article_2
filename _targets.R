@@ -12,6 +12,7 @@ library(here)
 library(dtplyr)
 library(hms)
 library(fs)
+library(embed)
 
 
 # Lire les fonctions ============================================================================================================
@@ -77,6 +78,16 @@ list(
   tar_target(
     outcome_vec,
     c("claim_ind_cov_2", "claim_ind_cov_3", "claim_ind_cov_4", "claim_ind_cov_2_4", "claim_ind_cov_1_2_3_4_5_6")
+  ),
+  
+  tar_target(
+    classic_recipes_ls,
+    {
+      recipes_ls <- map(outcome_vec, ~ define_classic_recipe(ml_data_classic$train, outcome = all_of(.x)))
+      names(recipes_ls) <- outcome_vec
+      
+      return(recipes_ls)
+    }
   )
   
   # =============================================================================================================================
