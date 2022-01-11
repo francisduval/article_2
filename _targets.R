@@ -113,7 +113,23 @@ list(
       ggsave(here("figures", "auc_plot_responses.png"), plot, width = 10)
       here("figures", "auc_plot_responses.png")
     }
+  ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Elastic-net avec quantité variable d'observations ---------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    ml_data_classic_frac,
+    {
+      set.seed(1994)
+      train <- map(seq(0.025, 1, by = 0.025), ~ slice_sample(ml_data_classic$train, prop = .))
+      test <- map(seq(0.025, 1, by = 0.025), ~ slice_sample(ml_data_classic$test, prop = .))
+      
+      return(list(complete = complete, train = train, test = test))
+    }
   )
+  
   
   # =============================================================================================================================
 )
