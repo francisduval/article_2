@@ -1,8 +1,21 @@
-# Lire les fonctions ============================================================================================================
-purrr::walk(fs::dir_ls("R"), source)
-
 # Importer les librairies =======================================================================================================
-lapply(make_lib_vec(), require, character.only = T)
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(rsample)
+library(lubridate)
+library(qs)
+library(fastDummies)
+library(here)
+library(dtplyr)
+library(hms)
+library(fs)
+
+
+# Lire les fonctions ============================================================================================================
+walk(dir_ls("R"), source)
 
 
 # Options et thème ==============================================================================================================
@@ -15,8 +28,7 @@ tar_option_set(
   garbage_collection = T,
   memory = "transient",
   format = "qs",
-  workspace_on_error = T,
-  packages = make_lib_vec()
+  workspace_on_error = T
 )
 
 
@@ -42,6 +54,20 @@ list(
         compute_extra_trip_vars()
     },
     pattern = map(trip_data)
+  ),
+  tar_target(
+    ml_data_classic,
+    {
+      ml_data <- create_ml_data_classic(augmented_trip_data)
+      
+      set.seed(2021)
+      split <- initial_split(ml_data, prop = 0.7)
+      
+      ml_data_train <- training(split)
+      ml_data_test <- testing(split)
+      
+      return(list(complete = ml_data, train = ml_data_train, test = ml_data_test))
+    }
   )
   
   # =============================================================================================================================
