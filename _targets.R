@@ -142,6 +142,29 @@ list(
       
       return(tune_ls)
     }
+  ),
+  
+  tar_target(
+    auc_plot_tuned_glmnet_frac,
+    {
+      df <- map_df(tuned_glmnet_frac_ls, collect_optimal_metrics)
+      
+      plot <- 
+        ggplot(df, aes(x = nb_train_obs, y = mean)) + 
+        geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err), size = 0.2) +
+        geom_line(size = 0.3, linetype = "dashed") +
+        geom_point(aes(y = auc_test), shape = 8, size = 0.7) +
+        ggtitle("Performance de validation-croisée du elastic-net") +
+        labs(
+          subtitle = "Prédicteurs classiques, variable réponse couvertures 1-2-3-4-5-6", 
+          caption = "- Le signe * indique l'AUC obtenu sur l'ensemble test\n- #obs_test = (3/7) * #obs_entrainement"
+        ) +
+        xlab("Nombre d'observations dans l'ensemble d'entrainement") +
+        ylab("AUC")
+      
+      ggsave(here("figures", "auc_plot_observations.png"), plot, width = 10)
+      here("figures", "auc_plot_observations.png")
+    }
   )
   
   # =============================================================================================================================
