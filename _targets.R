@@ -14,6 +14,7 @@ library(hms)
 library(fs)
 library(embed)
 library(glmnet)
+library(glue)
 
 
 # Lire les fonctions ============================================================================================================
@@ -148,6 +149,7 @@ list(
     auc_plot_tuned_glmnet_frac,
     {
       df <- map_df(tuned_glmnet_frac_ls, collect_optimal_metrics)
+      nrow_test <- nrow(ml_data_classic$test)
       
       plot <- 
         ggplot(df, aes(x = nb_train_obs, y = mean)) + 
@@ -157,7 +159,7 @@ list(
         ggtitle("Performance de validation-croisée du elastic-net") +
         labs(
           subtitle = "Prédicteurs classiques, variable réponse couvertures 1-2-3-4-5-6", 
-          caption = "- Le signe * indique l'AUC obtenu sur l'ensemble test\n- #obs_test = (3/7) * #obs_entrainement"
+          caption = glue("- Le signe * indique l'AUC obtenu sur l'ensemble test\n- #obs_test = {nrow_test}")
         ) +
         xlab("Nombre d'observations dans l'ensemble d'entrainement") +
         ylab("AUC")
