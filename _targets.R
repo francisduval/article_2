@@ -94,6 +94,25 @@ list(
   tar_target(
     tuned_glmnet_ls,
     map(classic_recipes_ls, ~ tune_train_binomial_glmnet(ml_data_classic$train, recipe = ., test_df = ml_data_classic$test))
+  ),
+  
+  tar_target(
+    auc_plot_responses,
+    {
+      df <- map_df(tuned_glmnet_ls, collect_optimal_metrics)
+      
+      plot <- 
+        ggplot(df, aes(x = outcome, y = mean)) + 
+        geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+        geom_point(aes(x = outcome, y = auc_test), shape = 8) +
+        ggtitle("Performance de validation-croisée du elastic-net") +
+        labs(subtitle = "Prédicteurs classiques", caption = "Le signe * indique l'AUC obtenu sur l'ensemble test") +
+        xlab("Variable réponse utilisée") +
+        ylab("AUC")
+      
+      ggsave(here("figures", "auc_plot_responses.png"), plot, width = 10)
+      here("figures", "auc_plot_responses.png")
+    }
   )
   
   # =============================================================================================================================
