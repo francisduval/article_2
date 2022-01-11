@@ -13,6 +13,7 @@ library(dtplyr)
 library(hms)
 library(fs)
 library(embed)
+library(glmnet)
 
 
 # Lire les fonctions ============================================================================================================
@@ -88,6 +89,11 @@ list(
       
       return(recipes_ls)
     }
+  ),
+  
+  tar_target(
+    tuned_glmnet_ls,
+    map(classic_recipes_ls, ~ tune_train_binomial_glmnet(ml_data_classic$train, recipe = ., test_df = ml_data_classic$test))
   )
   
   # =============================================================================================================================
