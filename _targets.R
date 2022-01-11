@@ -134,17 +134,15 @@ list(
     tuned_glmnet_frac_ls,
     {
       tune_ls <- 
-        map2(
-          ml_data_classic_frac$train, 
-          ml_data_classic_frac$test,
-          ~ tune_train_binomial_glmnet(.x, recipe = classic_recipes_ls$claim_ind_cov_1_2_3_4_5_6, test_df = .y)
+        map(
+          ml_data_classic_frac$train,
+          ~ tune_train_binomial_glmnet(.x, recipe = classic_recipes_ls$claim_ind_cov_1_2_3_4_5_6, test_df = ml_data_classic$test)
         )
       names(tune_ls) <- seq(0.025, 1, by = 0.025)
       
       return(tune_ls)
     }
   )
-  
   
   # =============================================================================================================================
 )
