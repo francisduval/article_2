@@ -177,6 +177,12 @@ list(
     vins_no_claim,
     extract_vins_claim_status(augmented_trip_data, response = claim_ind_cov_1_2_3_4_5_6, claim = F),
     pattern = map(augmented_trip_data)
+  ),
+  
+  tar_target(
+    vins_with_claim,
+    extract_vins_claim_status(augmented_trip_data, response = claim_ind_cov_1_2_3_4_5_6, claim = T),
+    pattern = map(augmented_trip_data)
   )
   
   # =============================================================================================================================
