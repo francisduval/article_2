@@ -207,6 +207,11 @@ list(
   tar_render(
     rmd_anomaly_detection,
     path = "RMarkdown/anomaly_detection/anomaly_detection.Rmd"
+  ),
+  
+  tar_render(
+    rmd_automatic_tuning_lof,
+    path = "RMarkdown/automatic_tuning_lof/automatic_tuning_lof.Rmd"
   )
   
   
