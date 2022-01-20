@@ -215,7 +215,9 @@ list(
       grid_c = seq(0.01, 0.2, length.out = 20),
       grid_k_frac = exp(seq(log(0.005), log(0.2), length.out = 10))
     ),
-    pattern = map(aug_trip_sample_group_vin)
+    pattern = map(aug_trip_sample_group_vin),
+    iteration = "list",
+    cue = tar_cue(mode = "never")
   ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
