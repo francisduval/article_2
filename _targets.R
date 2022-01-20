@@ -32,7 +32,7 @@ tar_option_set(
   garbage_collection = T,
   memory = "transient",
   format = "qs",
-  workspace_on_error = T
+  workspace_on_error = F
 )
 
 
