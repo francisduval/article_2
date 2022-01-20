@@ -228,7 +228,8 @@ list(
   tar_target(
     global_lofs,
     lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val), 
-    pattern = map(global_lofs_k_val)
+    pattern = map(global_lofs_k_val), 
+    iteration = "list"
   ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
