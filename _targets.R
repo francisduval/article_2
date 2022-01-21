@@ -239,32 +239,52 @@ list(
   
   tar_target(
     ml_data,
-    aug_trip_sample["vin"] %>% 
-      bind_cols(set_names(reduce(global_lofs, bind_cols), nm = glue("global_lof_{tar_read(global_lofs_k_val)}"))) %>% 
-      compute_stats(group = vin, vars = glue("global_lof_{tar_read(global_lofs_k_val)}")) %>% 
-      left_join(aug_trip_sample, by = "vin") %>% 
-      group_by(vin) %>% 
-      slice(1) %>% 
-      select(-all_of(make_trip_related_vars_vec()))
+    {
+      distance_df <- 
+        aug_trip_sample %>% 
+        group_by(vin) %>% 
+        summarise(distance = sum(distance)) %>% 
+        ungroup()
+      
+      ml_data <- 
+        aug_trip_sample["vin"] %>% 
+        bind_cols(set_names(reduce(global_lofs, bind_cols), nm = glue("global_lof_{tar_read(global_lofs_k_val)}"))) %>% 
+        compute_stats(group = vin, vars = glue("global_lof_{tar_read(global_lofs_k_val)}")) %>% 
+        left_join(aug_trip_sample, by = "vin") %>% 
+        group_by(vin) %>% 
+        slice(1) %>% 
+        select(-all_of(make_trip_related_vars_vec())) %>% 
+        left_join(distance_df, by = "vin")
+      
+      return(ml_data)
+    }
   ),
   
+  tar_target(
+    ml_data_split,
+    {
+      set.seed(2021)
+      split <- initial_split(ml_data, prop = 0.7)
+      return(split)
+    }
+  ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Définir les vecteurs de variables explicatives ------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    covariates_vecs,
-    list(
-      classic = c("annual_distance", "commute_distance"),
-      classic_distance = c("annual_distance", "commute_distance", "global_lof_10_mean")
-    )
-  ),
-
-  tar_map(
-    values = covariates_vecs,
-    tar_target(analysis, tune_train_binomial_glmnet(training(ml_data_split), rec, ml_data_test))
-  ),
+  # tar_target(
+  #   covariates_vecs,
+  #   list(
+  #     classic = make_classic_vars_vec(),
+  #     classic_distance = c(make_classic_vars_vec())
+  #   )
+  # ),
+  # 
+  # tar_map(
+  #   values = covariates_vecs,
+  #   tar_target(analysis, tune_train_binomial_glmnet(training(ml_data_split), rec, ml_data_test))
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # RMarkdown -------------------------------------------------------------------------------------------------------------------
