@@ -17,5 +17,6 @@ compute_stats <- function(data, group, vars) {
           q95 = ~ quantile(., probs = 0.95),
           q99 = ~ quantile(., probs = 0.99)
         )
-    )
+    ) %>% 
+    ungroup()
 }
