@@ -16,6 +16,7 @@ library(embed)
 library(glmnet)
 library(glue)
 library(dbscan)
+library(e1071)
 
 
 # Lire les fonctions ============================================================================================================
@@ -224,12 +225,27 @@ list(
   # LOF globaux pour aug_trip_sample --------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(global_lofs_k_val, c(2, 10, 20, 50, 100)),
+  tar_target(global_lofs_k_val, c(3, 10, 20)),
   tar_target(
     global_lofs,
     lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val), 
     pattern = map(global_lofs_k_val), 
     iteration = "list"
+  ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Jeu de données pour faire du machine learning -------------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    ml_data,
+    aug_trip_sample["vin"] %>% 
+      bind_cols(set_names(reduce(global_lofs, bind_cols), nm = glue("global_lof_{tar_read(global_lofs_k_val)}"))) %>% 
+      compute_stats(group = vin, vars = glue("global_lof_{tar_read(global_lofs_k_val)}")) %>% 
+      left_join(aug_trip_sample, by = "vin") %>% 
+      group_by(vin) %>% 
+      slice(1) %>% 
+      select(-all_of(make_trip_related_vars_vec()))
   ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
