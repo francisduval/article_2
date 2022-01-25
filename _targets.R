@@ -273,14 +273,20 @@ list(
   # Définir les vecteurs de variables explicatives ------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  # tar_target(
-  #   covariates_vecs,
-  #   list(
-  #     classic = make_classic_vars_vec(),
-  #     classic_distance = c(make_classic_vars_vec())
-  #   )
-  # ),
-  # 
+  tar_target(
+    covariates_vecs,
+    list(
+      class = make_classic_vars_vec(),
+      class_dist = c(make_classic_vars_vec(), "distance"),
+      class_dist_global_3 = c(make_classic_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_3")]),
+      class_dist_global_10 = c(make_classic_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_10")]),
+      class_dist_global_20 = c(make_classic_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_20")]),
+      global_3 = names(ml_data)[str_detect(names(ml_data), "global_lof_3")],
+      global_10 = names(ml_data)[str_detect(names(ml_data), "global_lof_10")],
+      global_20 = names(ml_data)[str_detect(names(ml_data), "global_lof_20")],
+    )
+  ),
+
   # tar_map(
   #   values = covariates_vecs,
   #   tar_target(analysis, tune_train_binomial_glmnet(training(ml_data_split), rec, ml_data_test))
