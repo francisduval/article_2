@@ -283,14 +283,17 @@ list(
       class_dist_global_20 = c(make_classic_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_20")]),
       global_3 = names(ml_data)[str_detect(names(ml_data), "global_lof_3")],
       global_10 = names(ml_data)[str_detect(names(ml_data), "global_lof_10")],
-      global_20 = names(ml_data)[str_detect(names(ml_data), "global_lof_20")],
-    )
+      global_20 = names(ml_data)[str_detect(names(ml_data), "global_lof_20")]
+    ),
+    iteration = "list"
   ),
-
-  # tar_map(
-  #   values = covariates_vecs,
-  #   tar_target(analysis, tune_train_binomial_glmnet(training(ml_data_split), rec, ml_data_test))
-  # ),
+  
+  tar_target(
+    recipes_ls,
+    define_recipe(training(ml_data_split), covariates = covariates_vecs),
+    pattern = map(covariates_vecs),
+    iteration = "list"
+  ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # RMarkdown -------------------------------------------------------------------------------------------------------------------
