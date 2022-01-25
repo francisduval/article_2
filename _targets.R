@@ -314,6 +314,11 @@ list(
   tar_render(
     rmd_automatic_tuning_lof,
     path = "RMarkdown/automatic_tuning_lof/automatic_tuning_lof.Rmd"
+  ),
+  
+  tar_render(
+    rmd_glmnet_results,
+    path = "RMarkdown/glmnet_results/glmnet_results.Rmd"
   )
   
   # =============================================================================================================================
