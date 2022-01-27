@@ -62,16 +62,14 @@ list(
   ),
   tar_target(
     ml_data_classic,
+    create_ml_data_classic(augmented_trip_data)
+  ),
+  tar_target(
+    ml_data_classic_split,
     {
-      ml_data <- create_ml_data_classic(augmented_trip_data)
-      
       set.seed(2021)
-      split <- initial_split(ml_data, prop = 0.7)
-      
-      ml_data_train <- training(split)
-      ml_data_test <- testing(split)
-      
-      return(list(complete = ml_data, train = ml_data_train, test = ml_data_test))
+      split <- initial_split(ml_data_classic, prop = 0.7)
+      return(split)
     }
   ),
   
@@ -87,7 +85,7 @@ list(
   tar_target(
     classic_recipes_ls,
     {
-      recipes_ls <- map(outcome_vec, ~ define_classic_recipe(ml_data_classic$train, outcome = all_of(.x)))
+      recipes_ls <- map(outcome_vec, ~ define_classic_recipe(training(ml_data_classic_split), outcome = all_of(.x)))
       names(recipes_ls) <- outcome_vec
       
       return(recipes_ls)
@@ -96,13 +94,15 @@ list(
   
   tar_target(
     tuned_glmnet_ls,
-    map(classic_recipes_ls, ~ tune_train_binomial_glmnet(ml_data_classic$train, recipe = ., test_df = ml_data_classic$test))
+    map(classic_recipes_ls, ~ tune_train_binomial_glmnet(ml_data_classic_split, recipe = .))
   ),
   
   tar_target(
     auc_plot_responses,
     {
-      df <- map_df(tuned_glmnet_ls, collect_optimal_metrics)
+      df <- 
+        map_df(tuned_glmnet_ls, collect_optimal_metrics) %>% 
+        filter(.metric == "roc_auc")
       
       plot <- 
         ggplot(df, aes(x = outcome, y = mean)) + 
@@ -121,28 +121,26 @@ list(
   # -----------------------------------------------------------------------------------------------------------------------------
   # Elastic-net avec quantité variable d'observations ---------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
-  
+
   tar_target(
-    ml_data_classic_frac,
+    ml_data_classic_frac_split,
     {
       set.seed(1994)
-      train <- map(seq(0.025, 1, by = 0.025), ~ slice_sample(ml_data_classic$train, prop = .))
-      test <- map(seq(0.025, 1, by = 0.025), ~ slice_sample(ml_data_classic$test, prop = .))
-      
-      return(list(complete = complete, train = train, test = test))
+      split_ls <- map(seq(0.025, 1, by = 0.025), ~ initial_split(slice_sample(ml_data_classic, prop = .), prop = 0.7))
+      return(split_ls)
     }
   ),
   
   tar_target(
     tuned_glmnet_frac_ls,
     {
-      tune_ls <- 
+      tune_ls <-
         map(
-          ml_data_classic_frac$train,
-          ~ tune_train_binomial_glmnet(.x, recipe = classic_recipes_ls$claim_ind_cov_1_2_3_4_5_6, test_df = ml_data_classic$test)
+          ml_data_classic_frac_split,
+          ~ tune_train_binomial_glmnet(.x, recipe = classic_recipes_ls$claim_ind_cov_1_2_3_4_5_6)
         )
       names(tune_ls) <- seq(0.025, 1, by = 0.025)
-      
+
       return(tune_ls)
     }
   ),
@@ -150,22 +148,24 @@ list(
   tar_target(
     auc_plot_tuned_glmnet_frac,
     {
-      df <- map_df(tuned_glmnet_frac_ls, collect_optimal_metrics)
+      df <- 
+        map_df(tuned_glmnet_frac_ls, collect_optimal_metrics) %>% 
+        filter(.metric == "roc_auc")
       nrow_test <- nrow(ml_data_classic$test)
-      
-      plot <- 
-        ggplot(df, aes(x = nb_train_obs, y = mean)) + 
+
+      plot <-
+        ggplot(df, aes(x = nb_train_obs, y = mean)) +
         geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err), size = 0.2) +
         geom_line(size = 0.3, linetype = "dashed") +
         geom_point(aes(y = auc_test), shape = 8, size = 0.7) +
         ggtitle("Performance de validation-croisée du elastic-net") +
         labs(
-          subtitle = "Prédicteurs classiques, variable réponse couvertures 1-2-3-4-5-6", 
+          subtitle = "Prédicteurs classiques, variable réponse couvertures 1-2-3-4-5-6",
           caption = glue("- Le signe * indique l'AUC obtenu sur l'ensemble test\n- #obs_test = {nrow_test}")
         ) +
         xlab("Nombre d'observations dans l'ensemble d'entrainement") +
         ylab("AUC")
-      
+
       ggsave(here("figures", "auc_plot_observations.png"), plot, width = 10)
       here("figures", "auc_plot_observations.png")
     }
@@ -298,12 +298,12 @@ list(
     iteration = "list"
   ),
   
-  tar_target(
-    glmnet_ls,
-    tune_train_binomial_glmnet(train_df = training(ml_data_split), recipe = recipes_ls, test_df = testing(ml_data_split)),
-    pattern = map(recipes_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   glmnet_ls,
+  #   tune_train_binomial_glmnet(train_df = training(ml_data_split), recipe = recipes_ls, test_df = testing(ml_data_split)),
+  #   pattern = map(recipes_ls),
+  #   iteration = "list"
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # RMarkdown -------------------------------------------------------------------------------------------------------------------
@@ -317,12 +317,12 @@ list(
   tar_render(
     rmd_automatic_tuning_lof,
     path = "RMarkdown/automatic_tuning_lof/automatic_tuning_lof.Rmd"
-  ),
+  )#,
   
-  tar_render(
-    rmd_glmnet_results,
-    path = "RMarkdown/glmnet_results/glmnet_results.Rmd"
-  )
+  # tar_render(
+  #   rmd_glmnet_results,
+  #   path = "RMarkdown/glmnet_results/glmnet_results.Rmd"
+  # )
   
   # =============================================================================================================================
 )

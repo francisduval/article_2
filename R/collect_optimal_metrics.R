@@ -6,7 +6,7 @@ collect_optimal_metrics <- function(tune_train_binomial_glmnet) {
     ) %>% 
     mutate(
       outcome = str_replace(tune_train_binomial_glmnet$outcome, "claim_ind_", ""),
-      nb_train_obs = nrow(tune_train_binomial_glmnet$train_df),
-      auc_test = tune_train_binomial_glmnet$auc_test
+      nb_train_obs = nrow(tune_train_binomial_glmnet$train),
+      auc_test = tune_train_binomial_glmnet$test_res %>% filter(.metric == "roc_auc") %>% pull(.estimate)
     )
 }

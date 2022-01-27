@@ -1,13 +1,14 @@
-tune_train_binomial_glmnet <- function(train_df, recipe, test_df) {
+tune_train_binomial_glmnet <- function(split, recipe) {
   # --------------
   
   outcome <- recipe$var_info$variable[which(recipe$var_info$role == "outcome")]
   predictors <- recipe$var_info$variable[which(recipe$var_info$role == "predictor")]
   
-  # --------------
+  train <- training(split)
+  test <- testing(split)
   
   set.seed(1994)
-  resamples <- vfold_cv(train_df, v = 5, strata = !!enquo(outcome))
+  resamples <- vfold_cv(train, v = 5, strata = !!enquo(outcome))
   grid <- grid_regular(penalty(), mixture(), levels = c(50, 5))
   
   tune_spec <-
@@ -29,7 +30,7 @@ tune_train_binomial_glmnet <- function(train_df, recipe, test_df) {
       wf,
       resamples = resamples,
       grid = grid,
-      metrics = metric_set(roc_auc),
+      metrics = metric_set(roc_auc, accuracy, sensitivity, specificity),
       control = control_grid(save_pred = T)
     )
   
@@ -37,47 +38,46 @@ tune_train_binomial_glmnet <- function(train_df, recipe, test_df) {
     tuning %>%
     select_best(metric = "roc_auc")
   
-  # --------------
+  cv_res <- 
+    collect_metrics(tuning) %>% 
+    filter(
+      penalty == best_params$penalty, 
+      mixture == best_params$mixture
+    )
   
-  pred_cv <- 
+  cv_pred <- 
     tuning %>% 
     collect_predictions(parameters = best_params)
   
-  roc_cv <- 
-    pred_cv %>% 
+  cv_roc <- 
+    cv_pred %>% 
     roc_curve(!!enquo(outcome), .pred_0)
-  
-  auc_cv <- 
-    pred_cv %>% 
-    roc_auc(!!enquo(outcome), .pred_0) %>% 
-    pull(.estimate)
   
   # --------------
   
-  fit <- 
-    wf %>%
-    finalize_workflow(best_params) %>%
-    fit(data = train_df)
+  last_fit <- 
+    wf %>% 
+    finalize_workflow(best_params) %>% 
+    last_fit(
+      split = split, 
+      metrics = metric_set(roc_auc, accuracy, sensitivity, specificity)
+    )
   
-  pred_test <- predict(fit, new_data = test_df, type = "prob")
+  fit <- last_fit$.workflow[[1]]
   
-  roc_test <- 
-    pred_test %>% 
-    bind_cols(test_df[outcome]) %>% 
+  test_res <- collect_metrics(last_fit)
+  test_pred <- collect_predictions(last_fit)
+  
+  test_roc <- 
+    test_pred %>% 
     roc_curve(!!enquo(outcome), .pred_0)
-  
-  auc_test <- 
-    pred_test %>% 
-    bind_cols(test_df[outcome]) %>% 
-    roc_auc(!!enquo(outcome), .pred_0) %>% 
-    pull(.estimate)
   
   # --------------
   
   res <- 
     list(
-      train_df = train_df,
-      test_df = test_df,
+      train = train,
+      test = test,
       recipe = recipe,
       predictors = predictors,
       outcome = outcome,
@@ -85,13 +85,14 @@ tune_train_binomial_glmnet <- function(train_df, recipe, test_df) {
       grid = grid,
       tuning = tuning,
       best_params = best_params,
-      pred_cv = pred_cv,
-      pred_test = pred_test,
-      roc_cv = roc_cv,
-      roc_test = roc_test,
-      auc_cv = auc_cv,
-      auc_test = auc_test,
-      fit = fit
+      cv_res = cv_res,
+      cv_pred = cv_pred,
+      cv_roc = cv_roc,
+      last_fit = last_fit,
+      fit = fit,
+      test_res = test_res,
+      test_pred = test_pred,
+      test_roc = test_roc
     )
   
   class(res) <- c("tune_train_binomial_glmnet", class(res))
