@@ -298,12 +298,12 @@ list(
     iteration = "list"
   ),
   
-  # tar_target(
-  #   glmnet_ls,
-  #   tune_train_binomial_glmnet(train_df = training(ml_data_split), recipe = recipes_ls, test_df = testing(ml_data_split)),
-  #   pattern = map(recipes_ls),
-  #   iteration = "list"
-  # ),
+  tar_target(
+    glmnet_ls,
+    tune_train_binomial_glmnet(ml_data_split, recipe = recipes_ls),
+    pattern = map(recipes_ls),
+    iteration = "list"
+  ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # RMarkdown -------------------------------------------------------------------------------------------------------------------
