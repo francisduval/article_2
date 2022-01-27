@@ -76,12 +76,8 @@ tune_train_binomial_glmnet_boot <- function(split, recipe, nboot = 50) {
   
   res <- 
     list(
-      train = train,
-      test = test,
-      recipe = recipe,
       predictors = predictors,
       outcome = outcome,
-      resamples = resamples,
       grid = grid,
       tuning = tuning,
       best_params = best_params,
