@@ -300,7 +300,7 @@ list(
   
   tar_target(
     glmnet_ls,
-    tune_train_binomial_glmnet(ml_data_split, recipe = recipes_ls),
+    tune_train_binomial_glmnet_boot(ml_data_split, recipe = recipes_ls),
     pattern = map(recipes_ls),
     iteration = "list"
   ),
