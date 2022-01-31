@@ -254,6 +254,12 @@ list(
         summarise(distance = sum(distance)) %>% 
         ungroup()
       
+      local_lofs_df <- 
+        aug_trip_sample %>% 
+        bind_cols(local_lofs = local_lofs) %>% 
+        compute_stats(group = vin, vars = "local_lofs") %>% 
+        rename_with(~ glue("local_lof_{.x}"), -vin)
+      
       ml_data <- 
         aug_trip_sample["vin"] %>% 
         bind_cols(set_names(reduce(global_lofs, bind_cols), nm = glue("global_lof_{tar_read(global_lofs_k_val)}"))) %>% 
@@ -261,8 +267,10 @@ list(
         left_join(aug_trip_sample, by = "vin") %>% 
         group_by(vin) %>% 
         slice(1) %>% 
+        ungroup() %>% 
         select(-all_of(make_trip_related_vars_vec())) %>% 
-        left_join(distance_df, by = "vin")
+        left_join(distance_df, by = "vin") %>% 
+        left_join(local_lofs_df, by = "vin") %>% 
       
       return(ml_data)
     }
