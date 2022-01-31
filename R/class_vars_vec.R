@@ -1,4 +1,4 @@
-make_classic_vars_vec <- function() {
+class_vars_vec <- function() {
   c(
     "annual_distance",
     "commute_distance",
