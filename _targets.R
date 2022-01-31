@@ -217,8 +217,7 @@ list(
       grid_k_frac = exp(seq(log(0.005), log(0.2), length.out = 10))
     ),
     pattern = map(aug_trip_sample_group_vin),
-    iteration = "list",
-    cue = tar_cue(mode = "never")
+    iteration = "list"
   ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -307,7 +306,7 @@ list(
   
   tar_target(
     glmnet_cv_res_ls,
-    glmnet_ls[["cv_res"]],
+    glmnet_ls[["tuning"]],
     pattern = map(glmnet_ls),
     iteration = "list"
   ),
