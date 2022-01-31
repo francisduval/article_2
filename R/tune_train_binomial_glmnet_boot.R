@@ -80,15 +80,15 @@ tune_train_binomial_glmnet_boot <- function(split, recipe, nboot = 50) {
       outcome = outcome,
       grid = grid,
       tuning = tuning,
-      best_params = best_params,
-      cv_res = cv_res,
-      cv_pred = cv_pred,
-      cv_roc = cv_roc,
-      last_fit = last_fit,
-      fit = fit,
-      test_res = test_res,
-      test_pred = test_pred,
-      test_roc = test_roc
+      best_params = best_params#,
+      # cv_res = cv_res,
+      # cv_pred = cv_pred,
+      # cv_roc = cv_roc,
+      # last_fit = last_fit,
+      # fit = fit,
+      # test_res = test_res,
+      # test_pred = test_pred,
+      # test_roc = test_roc
     )
   
   class(res) <- c("tune_train_binomial_glmnet", class(res))
