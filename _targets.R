@@ -229,6 +229,15 @@ list(
       unlist()
   ),
   
+  tar_target(
+    local_lofs_10,
+    aug_trip_sample %>% 
+      group_split(vin) %>% 
+      map(bake_data_lof) %>% 
+      map(~ lof(.x, minPts = 10)) %>% 
+      unlist()
+  ),
+  
   # -----------------------------------------------------------------------------------------------------------------------------
   # LOF globaux pour aug_trip_sample --------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -316,16 +325,14 @@ list(
     glmnet_ls,
     tune_train_binomial_glmnet_boot(ml_data_split, recipe = recipes_ls),
     pattern = map(recipes_ls),
-    iteration = "list",
-    cue = tar_cue(mode = "never")
+    iteration = "list"
   ),
   
   tar_target(
     glmnet_cv_res_ls,
     glmnet_ls[["tuning"]],
     pattern = map(glmnet_ls),
-    iteration = "list",
-    cue = tar_cue(mode = "never")
+    iteration = "list"
   ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
