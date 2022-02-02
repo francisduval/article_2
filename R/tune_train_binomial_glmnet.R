@@ -1,4 +1,4 @@
-tune_train_binomial_glmnet <- function(split, recipe) {
+tune_train_binomial_glmnet <- function(split, recipe, resamples) {
   # --------------
   
   outcome <- recipe$var_info$variable[which(recipe$var_info$role == "outcome")]
@@ -8,7 +8,6 @@ tune_train_binomial_glmnet <- function(split, recipe) {
   test <- testing(split)
   
   set.seed(1994)
-  resamples <- vfold_cv(train, v = 5, strata = !!enquo(outcome))
   grid <- grid_regular(penalty(), mixture(), levels = c(50, 5))
   
   tune_spec <-
@@ -38,21 +37,6 @@ tune_train_binomial_glmnet <- function(split, recipe) {
     tuning %>%
     select_best(metric = "roc_auc")
   
-  cv_res <- 
-    collect_metrics(tuning) %>% 
-    filter(
-      penalty == best_params$penalty, 
-      mixture == best_params$mixture
-    )
-  
-  cv_pred <- 
-    tuning %>% 
-    collect_predictions(parameters = best_params)
-  
-  cv_roc <- 
-    cv_pred %>% 
-    roc_curve(!!enquo(outcome), .pred_0)
-  
   # --------------
   
   last_fit <- 
@@ -63,36 +47,15 @@ tune_train_binomial_glmnet <- function(split, recipe) {
       metrics = metric_set(roc_auc, accuracy, sensitivity, specificity)
     )
   
-  fit <- last_fit$.workflow[[1]]
-  
-  test_res <- collect_metrics(last_fit)
-  test_pred <- collect_predictions(last_fit)
-  
-  test_roc <- 
-    test_pred %>% 
-    roc_curve(!!enquo(outcome), .pred_0)
-  
   # --------------
   
   res <- 
     list(
-      train = train,
-      test = test,
-      recipe = recipe,
-      predictors = predictors,
       outcome = outcome,
-      resamples = resamples,
-      grid = grid,
+      predictors = predictors,
       tuning = tuning,
       best_params = best_params,
-      cv_res = cv_res,
-      cv_pred = cv_pred,
-      cv_roc = cv_roc,
-      last_fit = last_fit,
-      fit = fit,
-      test_res = test_res,
-      test_pred = test_pred,
-      test_roc = test_roc
+      last_fit = last_fit
     )
   
   class(res) <- c("tune_train_binomial_glmnet", class(res))

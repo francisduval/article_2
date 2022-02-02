@@ -83,38 +83,60 @@ list(
   ),
   
   tar_target(
-    classic_recipes_ls,
-    {
-      recipes_ls <- map(outcome_vec, ~ define_classic_recipe(training(ml_data_classic_split), outcome = all_of(.x)))
-      names(recipes_ls) <- outcome_vec
-      
-      return(recipes_ls)
-    }
+    resamples_classic_ls, 
+    vfold_cv(training(ml_data_classic_split), v = 5, strata = outcome_vec),
+    pattern = map(outcome_vec),
+    iteration = "list"
   ),
   
   tar_target(
-    tuned_glmnet_ls,
-    map(classic_recipes_ls, ~ tune_train_binomial_glmnet(ml_data_classic_split, recipe = .))
+    recettes_classic_ls,
+    recipe(~ ., data = training(ml_data_classic_split)) %>%
+      update_role(-starts_with("c_"), new_role = "id") %>%
+      update_role(outcome_vec, new_role = "outcome") %>%
+      step_other(all_nominal_predictors(), threshold = 0.05) %>%
+      step_lencode_glm(all_nominal_predictors(), outcome = outcome_vec) %>%
+      step_impute_bag(c_commute_distance) %>%
+      step_normalize(all_predictors()) %>%
+      step_YeoJohnson(all_predictors()),
+    pattern = map(outcome_vec),
+    iteration = "list"
   ),
   
   tar_target(
-    auc_plot_responses,
+    glmnet_classic_ls,
+    tune_train_binomial_glmnet(ml_data_classic_split, recipe = recettes_classic_ls, resamples = resamples_classic_ls),
+    pattern = map(recettes_classic_ls, resamples_classic_ls),
+    iteration = "list"
+  ),
+
+  tar_target(
+    glmnet_classic_auc_plot,
     {
-      df <- 
-        map_df(tuned_glmnet_ls, collect_optimal_metrics) %>% 
-        filter(.metric == "roc_auc")
-      
-      plot <- 
-        ggplot(df, aes(x = outcome, y = mean)) + 
+      test_auc_vec <- 
+        map(glmnet_classic_ls, "last_fit") %>% 
+        map(collect_metrics) %>% 
+        map_df(filter, .metric == "roc_auc") %>% 
+        pull(.estimate)  
+     
+       df <- 
+        map(glmnet_classic_ls, "tuning") %>% 
+        map(collect_metrics) %>% 
+        map(filter, .metric == "roc_auc") %>% 
+        map_df(filter, mean == max(mean)) %>% 
+        mutate(outcome = outcome_vec, auc_test = test_auc_vec)
+        
+      plot <-
+        ggplot(df, aes(x = outcome, y = mean)) +
         geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
         geom_point(aes(x = outcome, y = auc_test), shape = 8) +
         ggtitle("Performance de validation-croisée du elastic-net") +
         labs(subtitle = "Prédicteurs classiques", caption = "Le signe * indique l'AUC obtenu sur l'ensemble test") +
         xlab("Variable réponse utilisée") +
         ylab("AUC")
-      
-      ggsave(here("figures", "auc_plot_responses.png"), plot, width = 10)
-      here("figures", "auc_plot_responses.png")
+
+      ggsave(here("figures", "glmnet_classic_auc_plot.png"), plot, width = 10)
+      here("figures", "glmnet_classic_auc_plot.png")
     }
   ),
   
@@ -122,52 +144,65 @@ list(
   # Elastic-net avec quantité variable d'observations ---------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
 
+  tar_target(fractions, seq(0.025, 1, by = 0.025)),
+  
   tar_target(
-    ml_data_classic_frac_split,
+    ml_data_classic_split_frac_ls,
     {
       set.seed(1994)
-      split_ls <- map(seq(0.025, 1, by = 0.025), ~ initial_split(slice_sample(ml_data_classic, prop = .), prop = 0.7))
-      return(split_ls)
-    }
+      initial_split(slice_sample(ml_data_classic, prop = fractions), prop = 0.7)
+    },
+    pattern = map(fractions),
+    iteration = "list"
   ),
   
   tar_target(
-    tuned_glmnet_frac_ls,
-    {
-      tune_ls <-
-        map(
-          ml_data_classic_frac_split,
-          ~ tune_train_binomial_glmnet(.x, recipe = classic_recipes_ls$claim_ind_cov_1_2_3_4_5_6)
-        )
-      names(tune_ls) <- seq(0.025, 1, by = 0.025)
-
-      return(tune_ls)
-    }
+    resamples_classic_frac_ls,
+    vfold_cv(training(ml_data_classic_split_frac_ls), v = 5, strata = "claim_ind_cov_1_2_3_4_5_6"),
+    pattern = map(ml_data_classic_split_frac_ls),
+    iteration = "list"
   ),
   
   tar_target(
-    auc_plot_tuned_glmnet_frac,
+    glmnet_classic_frac_ls,
+    tune_train_binomial_glmnet(
+      ml_data_classic_split_frac_ls, 
+      recipe = recettes_classic_ls[[which(outcome_vec == "claim_ind_cov_1_2_3_4_5_6")]], 
+      resamples = resamples_classic_frac_ls
+    ),
+    pattern = map(ml_data_classic_split_frac_ls, resamples_classic_frac_ls),
+    iteration = "list"
+  ),
+  
+  tar_target(
+    glmnet_classic_frac_auc_plot,
     {
+      test_auc_vec <- 
+        map(glmnet_classic_frac_ls, "last_fit") %>% 
+        map(collect_metrics) %>% 
+        map_df(filter, .metric == "roc_auc") %>% 
+        pull(.estimate)
+      
       df <- 
-        map_df(tuned_glmnet_frac_ls, collect_optimal_metrics) %>% 
-        filter(.metric == "roc_auc")
-      nrow_test <- nrow(ml_data_classic$test)
-
+        map(glmnet_classic_frac_ls, "tuning") %>% 
+        map_df(show_best, metric = "roc_auc", n = 1) %>%
+        mutate(outcome = nrow(training(ml_data_classic_split)) * fractions, auc_test = test_auc_vec)
+      
       plot <-
-        ggplot(df, aes(x = nb_train_obs, y = mean)) +
-        geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err), size = 0.2) +
+        ggplot(df, aes(x = outcome, y = mean)) +
+        geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+        geom_point(aes(x = outcome, y = auc_test), shape = 8) +
         geom_line(size = 0.3, linetype = "dashed") +
-        geom_point(aes(y = auc_test), shape = 8, size = 0.7) +
         ggtitle("Performance de validation-croisée du elastic-net") +
         labs(
-          subtitle = "Prédicteurs classiques, variable réponse couvertures 1-2-3-4-5-6",
-          caption = glue("- Le signe * indique l'AUC obtenu sur l'ensemble test\n- #obs_test = {nrow_test}")
+          subtitle = "Prédicteurs classiques, variable réponse couvertures 1-2-3-4-5-6", 
+          caption = "Le signe * indique l'AUC obtenu sur l'ensemble test"
         ) +
         xlab("Nombre d'observations dans l'ensemble d'entrainement") +
         ylab("AUC")
-
-      ggsave(here("figures", "auc_plot_observations.png"), plot, width = 10)
-      here("figures", "auc_plot_observations.png")
+      
+      ggsave(here("figures", "glmnet_classic_frac_auc_plot.png"), plot, width = 10)
+      here("figures", "glmnet_classic_frac_auc_plot.png")
     }
   ),
   
@@ -242,110 +277,139 @@ list(
   # LOF globaux pour aug_trip_sample --------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(global_lofs_k_val, c(3, 10, 20)),
+  tar_target(global_lofs_k_val, c(10, 20, 30)),
   tar_target(
     global_lofs,
-    lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val), 
-    pattern = map(global_lofs_k_val), 
+    lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val),
+    pattern = map(global_lofs_k_val),
     iteration = "list"
   ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
-  # Jeu de données pour faire du machine learning -------------------------------------------------------------------------------
+  # Un jeu de données pour chaque groupe de prédicteurs -------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
   tar_target(
-    ml_data,
-    {
-      distance_df <- 
-        aug_trip_sample %>% 
-        group_by(vin) %>% 
-        summarise(distance = sum(distance)) %>% 
-        ungroup()
-      
-      local_lofs_df <- 
-        aug_trip_sample %>% 
-        bind_cols(local_lofs = local_lofs) %>% 
-        compute_stats(group = vin, vars = "local_lofs") %>% 
-        rename_with(~ glue("local_lof_{.x}"), -vin)
-      
-      ml_data <- 
-        aug_trip_sample["vin"] %>% 
-        bind_cols(set_names(reduce(global_lofs, bind_cols), nm = glue("global_lof_{tar_read(global_lofs_k_val)}"))) %>% 
-        compute_stats(group = vin, vars = glue("global_lof_{tar_read(global_lofs_k_val)}")) %>% 
-        left_join(aug_trip_sample, by = "vin") %>% 
-        group_by(vin) %>% 
-        slice(1) %>% 
-        ungroup() %>% 
-        select(-all_of(make_trip_related_vars_vec())) %>% 
-        left_join(distance_df, by = "vin") %>% 
-        left_join(local_lofs_df, by = "vin") %>% 
-      
-      return(ml_data)
-    }
+    ml_data_class,
+    aug_trip_sample %>% 
+      group_by(vin) %>% 
+      slice(1) %>% 
+      select(vin, class_vars_vec()) %>% 
+      ungroup()
   ),
   
   tar_target(
-    ml_data_split,
-    {
-      set.seed(2021)
-      split <- initial_split(ml_data, prop = 0.7)
-      return(split)
-    }
+    ml_data_dist,
+    aug_trip_sample %>% 
+      group_by(vin) %>% 
+      summarise(distance = sum(distance)) %>% 
+      ungroup()
   ),
   
+  tar_target(
+    ml_data_local_lofs,
+    aug_trip_sample %>% 
+      bind_cols(local_lofs = local_lofs) %>% 
+      compute_stats(group = vin, vars = "local_lofs") %>% 
+      rename_with(~ glue("local_lof_{.x}"), -vin)
+  ),
+  
+  tar_target(
+    ml_data_local_10_lofs,
+    aug_trip_sample %>% 
+      bind_cols(local_10_lofs = local_lofs_10) %>% 
+      compute_stats(group = vin, vars = "local_10_lofs") %>% 
+      rename_with(~ glue("local_10_lof_{.x}"), -vin)
+  ),
+  
+  tar_target(
+    ml_data_global_lofs,
+    aug_trip_sample %>%
+      bind_cols(global_lofs = global_lofs) %>%
+      compute_stats(group = vin, vars = "global_lofs") %>%
+      rename_with(~ glue("global_lof_{global_lofs_k_val}_{.x}"), -vin),
+    pattern = map(global_lofs, global_lofs_k_val),
+    iteration = "list"
+  ),
+  
+  tar_target(
+    ml_data_response,
+    aug_trip_sample %>% 
+      group_by(vin) %>% 
+      slice(1) %>% 
+      select(vin, "claim_ind_cov_1_2_3_4_5_6") %>% 
+      ungroup()
+  ),
+
   # -----------------------------------------------------------------------------------------------------------------------------
-  # Définir les vecteurs de variables explicatives ------------------------------------------------------------------------------
+  # Liste de jeux de données pour la classification -----------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
   tar_target(
-    covariates_vecs,
+    ml_df_ls,
     list(
-      class = class_vars_vec(),
-      class_dist = c(class_vars_vec(), "distance"),
-      class_dist_local = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "local_lof")]),
-      class_dist_global_3 = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_3")]),
-      class_dist_global_10 = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_10")]),
-      class_dist_global_20 = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_20")]),
-      class_dist_global_3_local = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_3|local_lof")]),
-      class_dist_global_10_local = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_10|local_lof")]),
-      class_dist_global_20_local = c(class_vars_vec(), "distance", names(ml_data)[str_detect(names(ml_data), "global_lof_20|local_lof")])
+      class = reduce(list(ml_data_class, ml_data_response), left_join, by = "vin"),
+      class_dist = reduce(list(ml_data_class, ml_data_dist, ml_data_response), left_join, by = "vin"),
+      class_dist_local_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs, ml_data_response), left_join, by = "vin"),
+      class_dist_local_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_10_lofs, ml_data_response), left_join, by = "vin"),
+      class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
+      class_dist_global_20_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 20)]], ml_data_response), left_join, by = "vin"),
+      class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin")
     ),
     iteration = "list"
   ),
   
   tar_target(
-    recipes_ls,
-    define_recipe(training(ml_data_split), covariates = covariates_vecs),
-    pattern = map(covariates_vecs),
+    ml_split_ls,
+    {
+      set.seed(2021)
+      initial_split(ml_df_ls, prop = 0.7)
+    },
+    pattern = map(ml_df_ls),
     iteration = "list"
   ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Liste de recettes de prétraitement pour la classification -------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    recettes_ls,
+    recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = training(ml_split_ls)) %>%
+      update_role(vin, new_role = "id") %>%
+      step_other(all_nominal_predictors(), threshold = 0.05) %>%
+      step_lencode_glm(all_nominal_predictors(), outcome = "claim_ind_cov_1_2_3_4_5_6") %>%
+      step_impute_bag(all_predictors()) %>%
+      step_normalize(all_predictors()) %>%
+      step_YeoJohnson(all_predictors()),
+    pattern = map(ml_split_ls),
+    iteration = "list"
+  ),
+
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Liste de resamples ----------------------------------------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    bootstrap_ls,
+    {
+      set.seed(1994)
+      bootstraps(training(ml_split_ls), times = 50, strata = "claim_ind_cov_1_2_3_4_5_6")
+    },
+    pattern = map(ml_split_ls),
+    iteration = "list"
+  ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Calibrer et entrainer les modèles -------------------------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
   
   tar_target(
     glmnet_ls,
-    tune_train_binomial_glmnet_boot(ml_data_split, recipe = recipes_ls),
-    pattern = map(recipes_ls),
+    tune_train_binomial_glmnet(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_ls),
+    pattern = map(ml_split_ls, recettes_ls, bootstrap_ls),
     iteration = "list"
-  ),
-  
-  # -----------------------------------------------------------------------------------------------------------------------------
-  # RMarkdown -------------------------------------------------------------------------------------------------------------------
-  # -----------------------------------------------------------------------------------------------------------------------------
-  
-  tar_render(
-    rmd_anomaly_detection,
-    path = "RMarkdown/anomaly_detection/anomaly_detection.Rmd"
-  ),
-  
-  tar_render(
-    rmd_automatic_tuning_lof,
-    path = "RMarkdown/automatic_tuning_lof/automatic_tuning_lof.Rmd"
-  )#,
-  
-  # tar_render(
-  #   rmd_glmnet_results,
-  #   path = "RMarkdown/glmnet_results/glmnet_results.Rmd"
-  # )
+  )
   
   # =============================================================================================================================
 )
