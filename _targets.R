@@ -409,6 +409,13 @@ list(
     tune_train_binomial_glmnet(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_ls),
     pattern = map(ml_split_ls, recettes_ls, bootstrap_ls),
     iteration = "list"
+  ),
+  
+  tar_target(
+    glmnet_tuning_ls,
+    glmnet_ls[["tuning"]],
+    pattern = map(glmnet_ls),
+    iteration = "list"
   )
   
   # =============================================================================================================================
