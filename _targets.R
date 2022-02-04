@@ -17,6 +17,7 @@ library(glmnet)
 library(glue)
 library(dbscan)
 library(e1071)
+library(ranger)
 
 
 # Lire les fonctions ============================================================================================================
@@ -427,6 +428,14 @@ list(
     tune_train_xgboost(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
     pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
     iteration = "list"
+  ),
+  
+  tar_target(
+    rf_ls,
+    tune_rf(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
+    pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
+    iteration = "list",
+    cue = tar_cue(mode = "never")
   ),
 
   tar_target(
