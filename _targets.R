@@ -277,7 +277,7 @@ list(
   # LOF globaux pour aug_trip_sample --------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(global_lofs_k_val, c(10, 20, 30)),
+  tar_target(global_lofs_k_val, c(10, 20, 30, 40)),
   tar_target(
     global_lofs,
     lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val),
@@ -354,7 +354,8 @@ list(
       class_dist_local_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_10_lofs, ml_data_response), left_join, by = "vin"),
       class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
       class_dist_global_20_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 20)]], ml_data_response), left_join, by = "vin"),
-      class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin")
+      class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin"),
+      class_dist_global_40_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 40)]], ml_data_response), left_join, by = "vin")
     ),
     iteration = "list"
   ),
@@ -400,6 +401,16 @@ list(
     iteration = "list"
   ),
   
+  tar_target(
+    bootstrap_xgb_ls,
+    {
+      set.seed(1994)
+      bootstraps(training(ml_split_ls), times = 25, strata = "claim_ind_cov_1_2_3_4_5_6")
+    },
+    pattern = map(ml_split_ls),
+    iteration = "list"
+  ),
+  
   # -----------------------------------------------------------------------------------------------------------------------------
   # Calibrer et entrainer les modèles -------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -410,7 +421,14 @@ list(
     pattern = map(ml_split_ls, recettes_ls, bootstrap_ls),
     iteration = "list"
   ),
-  
+
+  tar_target(
+    xgb_ls,
+    tune_train_xgboost(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
+    pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
+    iteration = "list"
+  ),
+
   tar_target(
     glmnet_tuning_ls,
     glmnet_ls[["tuning"]],
