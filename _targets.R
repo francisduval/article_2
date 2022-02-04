@@ -434,6 +434,13 @@ list(
     glmnet_ls[["tuning"]],
     pattern = map(glmnet_ls),
     iteration = "list"
+  ),
+  
+  tar_target(
+    xgb_tuning_ls,
+    xgb_ls[["tuning"]],
+    pattern = map(xgb_ls),
+    iteration = "list"
   )
   
   # =============================================================================================================================
