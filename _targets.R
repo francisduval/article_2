@@ -233,6 +233,20 @@ list(
     filter(aug_trip_sample, vin %in% c(vins_no_claim[1:10], vins_with_claim[1:10]))
   ),
   
+  tar_target(
+    aug_trip_sample_baked,
+    bake_data_lof(aug_trip_sample)
+  ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Distance de Mahalanobis pour aug_trip_sample --------------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    global_maha,
+    mahalanobis(aug_trip_sample_baked, center = colMeans(aug_trip_sample_baked), cov = cov(aug_trip_sample_baked))
+  ),
+  
   # -----------------------------------------------------------------------------------------------------------------------------
   # LOF locaux pour aug_trip_sample ---------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -308,6 +322,14 @@ list(
   ),
   
   tar_target(
+    ml_data_global_maha,
+    aug_trip_sample %>% 
+      bind_cols(global_maha = global_maha) %>% 
+      compute_stats(group = vin, vars = "global_maha") %>% 
+      rename_with(~ glue("global_maha_{.x}"), -vin)
+  ),
+  
+  tar_target(
     ml_data_local_lofs,
     aug_trip_sample %>% 
       bind_cols(local_lofs = local_lofs) %>% 
@@ -351,6 +373,7 @@ list(
     list(
       class = reduce(list(ml_data_class, ml_data_response), left_join, by = "vin"),
       class_dist = reduce(list(ml_data_class, ml_data_dist, ml_data_response), left_join, by = "vin"),
+      class_dist_global_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_global_maha, ml_data_response), left_join, by = "vin"),
       class_dist_local_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs, ml_data_response), left_join, by = "vin"),
       class_dist_local_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_10_lofs, ml_data_response), left_join, by = "vin"),
       class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
@@ -434,10 +457,11 @@ list(
     rf_ls,
     tune_rf(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
     pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
-    iteration = "list",
-    cue = tar_cue(mode = "never")
+    iteration = "list"
   ),
 
+  # ----------
+  
   tar_target(
     glmnet_tuning_ls,
     glmnet_ls[["tuning"]],
