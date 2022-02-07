@@ -474,6 +474,13 @@ list(
     xgb_ls[["tuning"]],
     pattern = map(xgb_ls),
     iteration = "list"
+  ),
+  
+  tar_target(
+    rf_tuning_ls,
+    rf_ls[["tuning"]],
+    pattern = map(rf_ls),
+    iteration = "list"
   )
   
   # =============================================================================================================================
