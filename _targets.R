@@ -247,6 +247,15 @@ list(
     mahalanobis(aug_trip_sample_baked, center = colMeans(aug_trip_sample_baked), cov = cov(aug_trip_sample_baked))
   ),
   
+  tar_target(
+    local_maha,
+    aug_trip_sample %>% 
+      group_split(vin) %>% 
+      map(bake_data_lof) %>% 
+      map(~ mahalanobis(.x, center = colMeans(.x), cov = cov(.x))) %>% 
+      unlist()
+  ),
+  
   # -----------------------------------------------------------------------------------------------------------------------------
   # LOF locaux pour aug_trip_sample ---------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -327,6 +336,14 @@ list(
       bind_cols(global_maha = global_maha) %>% 
       compute_stats(group = vin, vars = "global_maha") %>% 
       rename_with(~ glue("global_maha_{.x}"), -vin)
+  ),
+  
+  tar_target(
+    ml_data_local_maha,
+    aug_trip_sample %>% 
+      bind_cols(local_maha = local_maha) %>% 
+      compute_stats(group = vin, vars = "local_maha") %>% 
+      rename_with(~ glue("local_maha_{.x}"), -vin)
   ),
   
   tar_target(
