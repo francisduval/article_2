@@ -391,6 +391,7 @@ list(
       class = reduce(list(ml_data_class, ml_data_response), left_join, by = "vin"),
       class_dist = reduce(list(ml_data_class, ml_data_dist, ml_data_response), left_join, by = "vin"),
       class_dist_global_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_global_maha, ml_data_response), left_join, by = "vin"),
+      class_dist_local_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_local_maha, ml_data_response), left_join, by = "vin"),
       class_dist_local_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs, ml_data_response), left_join, by = "vin"),
       class_dist_local_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_10_lofs, ml_data_response), left_join, by = "vin"),
       class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
@@ -497,6 +498,15 @@ list(
     rf_tuning_ls,
     rf_ls[["tuning"]],
     pattern = map(rf_ls),
+    iteration = "list"
+  ),
+  
+  # ----------
+  
+  tar_target(
+    glmnet_last_fit_ls,
+    glmnet_ls[["last_fit"]],
+    pattern = map(glmnet_ls),
     iteration = "list"
   )
   
