@@ -355,14 +355,6 @@ list(
   ),
   
   tar_target(
-    ml_data_local_10_lofs,
-    aug_trip_sample %>% 
-      bind_cols(local_10_lofs = local_lofs_10) %>% 
-      compute_stats(group = vin, vars = "local_10_lofs") %>% 
-      rename_with(~ glue("local_10_lof_{.x}"), -vin)
-  ),
-  
-  tar_target(
     ml_data_global_lofs,
     aug_trip_sample %>%
       bind_cols(global_lofs = global_lofs) %>%
@@ -393,7 +385,6 @@ list(
       class_dist_global_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_global_maha, ml_data_response), left_join, by = "vin"),
       class_dist_local_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_local_maha, ml_data_response), left_join, by = "vin"),
       class_dist_local_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs, ml_data_response), left_join, by = "vin"),
-      class_dist_local_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_10_lofs, ml_data_response), left_join, by = "vin"),
       class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
       class_dist_global_20_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 20)]], ml_data_response), left_join, by = "vin"),
       class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin"),
