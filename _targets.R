@@ -391,9 +391,17 @@ list(
   tar_target(
     ml_data_local_if,
     aug_trip_sample %>% 
-      bind_cols(local_if = local_if_vec) %>% 
+      bind_cols(local_if = unlist(local_if)) %>% 
       compute_stats(group = vin, vars = "local_if") %>% 
       rename_with(~ glue("local_if_{.x}"), -vin)
+  ),
+  
+  tar_target(
+    ml_data_global_if,
+    aug_trip_sample %>% 
+      bind_cols(global_if = global_if) %>% 
+      compute_stats(group = vin, vars = "global_if") %>% 
+      rename_with(~ glue("global_if_{.x}"), -vin)
   ),
   
   tar_target(
