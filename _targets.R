@@ -312,6 +312,11 @@ list(
   ),
   
   tar_target(
+    local_if_vec,
+    unlist(local_if)
+  ),
+  
+  tar_target(
     global_if,
     compute_scores_iforest(aug_trip_sample_baked)
   ),
@@ -381,6 +386,14 @@ list(
       rename_with(~ glue("global_lof_{global_lofs_k_val}_{.x}"), -vin),
     pattern = map(global_lofs, global_lofs_k_val),
     iteration = "list"
+  ),
+  
+  tar_target(
+    ml_data_local_if,
+    aug_trip_sample %>% 
+      bind_cols(local_if = local_if_vec) %>% 
+      compute_stats(group = vin, vars = "local_if") %>% 
+      rename_with(~ glue("local_if_{.x}"), -vin)
   ),
   
   tar_target(
