@@ -504,16 +504,6 @@ list(
     iteration = "list"
   ),
   
-  tar_target(
-    bootstrap_xgb_ls,
-    {
-      set.seed(1994)
-      bootstraps(training(ml_split_ls), times = 25, strata = "claim_ind_cov_1_2_3_4_5_6")
-    },
-    pattern = map(ml_split_ls),
-    iteration = "list"
-  ),
-  
   # -----------------------------------------------------------------------------------------------------------------------------
   # Calibrer et entrainer les modèles -------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -525,20 +515,6 @@ list(
     iteration = "list"
   ),
 
-  # tar_target(
-  #   xgb_ls,
-  #   tune_train_xgboost(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
-  #   pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
-  #   iteration = "list"
-  # ),
-  # 
-  # tar_target(
-  #   rf_ls,
-  #   tune_rf(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
-  #   pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
-  #   iteration = "list"
-  # ),
-
   # ----------
   
   tar_target(
@@ -547,20 +523,6 @@ list(
     pattern = map(glmnet_ls),
     iteration = "list"
   ),
-  
-  # tar_target(
-  #   xgb_tuning_ls,
-  #   xgb_ls[["tuning"]],
-  #   pattern = map(xgb_ls),
-  #   iteration = "list"
-  # ),
-  # 
-  # tar_target(
-  #   rf_tuning_ls,
-  #   rf_ls[["tuning"]],
-  #   pattern = map(rf_ls),
-  #   iteration = "list"
-  # ),
   
   # ----------
   
