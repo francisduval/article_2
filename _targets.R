@@ -238,12 +238,14 @@ list(
       return(list(train = train_vins, test = test_vins))
     }
   ),
+  
+  tar_target(aug_trip_sample_train, filter(augmented_trip_data, vin %in% train_test_vins$train)),
+  tar_target(aug_trip_sample_test, filter(augmented_trip_data, vin %in% train_test_vins$test)),
 
   tar_target(
     aug_trip_sample,
     filter(augmented_trip_data, vin %in% c(vins_no_claim[1:length(vins_with_claim)], vins_with_claim))
   ),
-  
   
   tar_target(
     aug_trip_sample_baked,
