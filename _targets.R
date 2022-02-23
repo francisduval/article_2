@@ -231,11 +231,6 @@ list(
   ),
   
   tar_target(
-    aug_trip_small_sample,
-    filter(aug_trip_sample, vin %in% c(vins_no_claim[1:10], vins_with_claim[1:10]))
-  ),
-  
-  tar_target(
     aug_trip_sample_baked,
     bake_data_lof(aug_trip_sample)
   ),
