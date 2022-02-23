@@ -224,11 +224,26 @@ list(
     extract_vins_claim_status(augmented_trip_data, response = claim_ind_cov_1_2_3_4_5_6, claim = T),
     pattern = map(augmented_trip_data)
   ),
+  
+  tar_target(
+    train_test_vins,
+    {
+      set.seed(2022)
+      train_idx <- sample(seq_along(vins_with_claim), size = round(0.7 * length(vins_with_claim)))
+      test_idx <- seq_along(vins_with_claim)[-train_idx]
+      
+      train_vins <- c(vins_no_claim[train_idx], vins_with_claim[train_idx])
+      test_vins <- c(vins_no_claim[test_idx], vins_with_claim[test_idx])
+      
+      return(list(train = train_vins, test = test_vins))
+    }
+  ),
 
   tar_target(
     aug_trip_sample,
     filter(augmented_trip_data, vin %in% c(vins_no_claim[1:length(vins_with_claim)], vins_with_claim))
   ),
+  
   
   tar_target(
     aug_trip_sample_baked,
