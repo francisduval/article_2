@@ -290,15 +290,6 @@ list(
       unlist()
   ),
   
-  tar_target(
-    local_lofs_10,
-    aug_trip_sample %>% 
-      group_split(vin) %>% 
-      map(bake_data_lof) %>% 
-      map(~ lof(.x, minPts = 10)) %>% 
-      unlist()
-  ),
-  
   tar_target(frac_grid_local_lofs, c(0.05, 0.1, 0.15, 0.2)),
   
   tar_target(
