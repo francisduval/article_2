@@ -35,7 +35,8 @@ tar_option_set(
   garbage_collection = T,
   memory = "transient",
   format = "qs",
-  workspace_on_error = F
+  workspace_on_error = F,
+  iteration = "vector"
 )
 
 
@@ -298,6 +299,19 @@ list(
       unlist()
   ),
   
+  tar_target(frac_grid_local_lofs, c(0.05, 0.1, 0.15, 0.2)),
+  
+  tar_target(
+    local_lofs_frac,
+    aug_trip_sample %>%
+      group_split(vin) %>% 
+      map(bake_data_lof) %>% 
+      map(~ lof(., minPts = round(frac_grid_local_lofs * nrow(.)))) %>% 
+      unlist(),
+    pattern = map(frac_grid_local_lofs),
+    iteration = "list"
+  ),
+  
   # -----------------------------------------------------------------------------------------------------------------------------
   # Isolation forest ------------------------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
@@ -389,6 +403,16 @@ list(
   ),
   
   tar_target(
+    ml_data_local_lofs_frac,
+    aug_trip_sample %>%
+      bind_cols(local_lofs_frac = local_lofs_frac) %>%
+      compute_stats(group = vin, vars = "local_lofs_frac") %>%
+      rename_with(~ glue("local_lofs_frac_{frac_grid_local_lofs}_{.x}"), -vin),
+    pattern = map(local_lofs_frac, frac_grid_local_lofs),
+    iteration = "list"
+  ),
+  
+  tar_target(
     ml_data_local_if,
     aug_trip_sample %>% 
       bind_cols(local_if = unlist(local_if)) %>% 
@@ -428,7 +452,13 @@ list(
       class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
       class_dist_global_20_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 20)]], ml_data_response), left_join, by = "vin"),
       class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin"),
-      class_dist_global_40_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 40)]], ml_data_response), left_join, by = "vin")
+      class_dist_global_40_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 40)]], ml_data_response), left_join, by = "vin"),
+      class_dist_local_if = reduce(list(ml_data_class, ml_data_dist, ml_data_local_if, ml_data_response), left_join, by = "vin"),
+      class_dist_global_if = reduce(list(ml_data_class, ml_data_dist, ml_data_global_if, ml_data_response), left_join, by = "vin"),
+      class_dist_local_05_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.05)]], ml_data_response), left_join, by = "vin"),
+      class_dist_local_10_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.1)]], ml_data_response), left_join, by = "vin"),
+      class_dist_local_15_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.15)]], ml_data_response), left_join, by = "vin"),
+      class_dist_local_20_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.2)]], ml_data_response), left_join, by = "vin")
     ),
     iteration = "list"
   ),
@@ -495,19 +525,19 @@ list(
     iteration = "list"
   ),
 
-  tar_target(
-    xgb_ls,
-    tune_train_xgboost(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
-    pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
-    iteration = "list"
-  ),
-  
-  tar_target(
-    rf_ls,
-    tune_rf(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
-    pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   xgb_ls,
+  #   tune_train_xgboost(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
+  #   pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
+  #   iteration = "list"
+  # ),
+  # 
+  # tar_target(
+  #   rf_ls,
+  #   tune_rf(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_xgb_ls),
+  #   pattern = map(ml_split_ls, recettes_ls, bootstrap_xgb_ls),
+  #   iteration = "list"
+  # ),
 
   # ----------
   
@@ -518,19 +548,19 @@ list(
     iteration = "list"
   ),
   
-  tar_target(
-    xgb_tuning_ls,
-    xgb_ls[["tuning"]],
-    pattern = map(xgb_ls),
-    iteration = "list"
-  ),
-  
-  tar_target(
-    rf_tuning_ls,
-    rf_ls[["tuning"]],
-    pattern = map(rf_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   xgb_tuning_ls,
+  #   xgb_ls[["tuning"]],
+  #   pattern = map(xgb_ls),
+  #   iteration = "list"
+  # ),
+  # 
+  # tar_target(
+  #   rf_tuning_ls,
+  #   rf_ls[["tuning"]],
+  #   pattern = map(rf_ls),
+  #   iteration = "list"
+  # ),
   
   # ----------
   
