@@ -5,6 +5,6 @@ compute_percentiles <- function(data, vars) {
   
   data %>% 
     group_by(vin) %>% 
-    summarize_at(vars(vars), p_funs) %>% 
+    summarize_at(all_of(vars), p_funs) %>% 
     ungroup()
 }
