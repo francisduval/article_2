@@ -313,10 +313,19 @@ list(
     iteration = "list"
   ),
   
+  # ----------
+  
   tar_target(
     local_lof_tune,
     cv_logreg(local_lof_train_ml, recipe = recipe_tune_anomaly),
     pattern = map(local_lof_train_ml),
+    iteration = "list"
+  ),
+  
+  tar_target(
+    global_lof_tune,
+    cv_logreg(global_lof_train_ml, recipe = recipe_tune_anomaly),
+    pattern = map(global_lof_train_ml),
     iteration = "list"
   )
   
