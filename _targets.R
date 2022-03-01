@@ -22,6 +22,8 @@ library(ranger)
 library(solitude)
 library(mixOmics)
 map <- purrr::map
+filter <- dplyr::filter
+select <- dplyr::select
 
 
 # Lire les fonctions ============================================================================================================
@@ -260,293 +262,305 @@ list(
   # Choix des paramètres pour les méthodes de détection d'anomalies ------------------------------------------------------------- 
   # -----------------------------------------------------------------------------------------------------------------------------
   
+  tar_target(local_lof_grid, seq(0.05, 0.5, by = 0.05)),
+  tar_target(
+    local_lof_train,
+    compute_local_lofs(aug_trip_sample_train, k_frac = local_lof_grid),
+    pattern = map(local_lof_grid),
+    iteration = "list"
+  ),
   
-  
-  
+  tar_target(global_lof_grid, seq(5, 50, by = 5)),
+  tar_target(
+    global_lof_train,
+    compute_global_lofs(aug_trip_sample_train, k = global_lof_grid),
+    pattern = map(global_lof_grid),
+    iteration = "list"
+  )
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Distance de Mahalanobis pour aug_trip_sample --------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    global_maha,
-    mahalanobis(aug_trip_sample_baked, center = colMeans(aug_trip_sample_baked), cov = cov(aug_trip_sample_baked))
-  ),
+  # tar_target(
+  #   global_maha,
+  #   mahalanobis(aug_trip_sample_baked, center = colMeans(aug_trip_sample_baked), cov = cov(aug_trip_sample_baked))
+  # ),
   
-  tar_target(
-    local_maha,
-    aug_trip_sample %>% 
-      group_split(vin) %>% 
-      map(bake_data_lof) %>% 
-      map(~ mahalanobis(.x, center = colMeans(.x), cov = cov(.x))) %>% 
-      unlist()
-  ),
+  # tar_target(
+  #   local_maha,
+  #   aug_trip_sample %>% 
+  #     group_split(vin) %>% 
+  #     map(bake_data_lof) %>% 
+  #     map(~ mahalanobis(.x, center = colMeans(.x), cov = cov(.x))) %>% 
+  #     unlist()
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # LOF locaux pour aug_trip_sample ---------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    aug_trip_sample_group_vin,
-    aug_trip_sample %>% 
-      group_by(vin) %>% 
-      tar_group(),
-    iteration = "group"
-  ),
+  # tar_target(
+  #   aug_trip_sample_group_vin,
+  #   aug_trip_sample %>% 
+  #     group_by(vin) %>% 
+  #     tar_group(),
+  #   iteration = "group"
+  # ),
   
-  tar_target(
-    local_lofs_tuning,
-    autotune_lof(
-      data = aug_trip_sample_group_vin,
-      grid_c = seq(0.01, 0.2, length.out = 20),
-      grid_k_frac = exp(seq(log(0.005), log(0.2), length.out = 10))
-    ),
-    pattern = map(aug_trip_sample_group_vin),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   local_lofs_tuning,
+  #   autotune_lof(
+  #     data = aug_trip_sample_group_vin,
+  #     grid_c = seq(0.01, 0.2, length.out = 20),
+  #     grid_k_frac = exp(seq(log(0.005), log(0.2), length.out = 10))
+  #   ),
+  #   pattern = map(aug_trip_sample_group_vin),
+  #   iteration = "list"
+  # ),
   
-  tar_target(
-    local_lofs,
-    aug_trip_sample %>% 
-      group_split(vin) %>% 
-      map(bake_data_lof) %>% 
-      map2(map_dbl(local_lofs_tuning, "k_opt"), ~ lof(.x, minPts = .y)) %>% 
-      unlist()
-  ),
+  # tar_target(
+  #   local_lofs,
+  #   aug_trip_sample %>% 
+  #     group_split(vin) %>% 
+  #     map(bake_data_lof) %>% 
+  #     map2(map_dbl(local_lofs_tuning, "k_opt"), ~ lof(.x, minPts = .y)) %>% 
+  #     unlist()
+  # ),
   
-  tar_target(frac_grid_local_lofs, c(0.05, 0.1, 0.15, 0.2)),
+  # tar_target(frac_grid_local_lofs, c(0.05, 0.1, 0.15, 0.2)),
   
-  tar_target(
-    local_lofs_frac,
-    aug_trip_sample %>%
-      group_split(vin) %>% 
-      map(bake_data_lof) %>% 
-      map(~ lof(., minPts = round(frac_grid_local_lofs * nrow(.)))) %>% 
-      unlist(),
-    pattern = map(frac_grid_local_lofs),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   local_lofs_frac,
+  #   aug_trip_sample %>%
+  #     group_split(vin) %>% 
+  #     map(bake_data_lof) %>% 
+  #     map(~ lof(., minPts = round(frac_grid_local_lofs * nrow(.)))) %>% 
+  #     unlist(),
+  #   pattern = map(frac_grid_local_lofs),
+  #   iteration = "list"
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Isolation forest ------------------------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    local_if,
-    aug_trip_sample_group_vin %>% 
-      bake_data_lof %>% 
-      compute_scores_iforest(),
-    pattern = map(aug_trip_sample_group_vin),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   local_if,
+  #   aug_trip_sample_group_vin %>% 
+  #     bake_data_lof %>% 
+  #     compute_scores_iforest(),
+  #   pattern = map(aug_trip_sample_group_vin),
+  #   iteration = "list"
+  # ),
   
-  tar_target(
-    local_if_vec,
-    unlist(local_if)
-  ),
+  # tar_target(
+  #   local_if_vec,
+  #   unlist(local_if)
+  # ),
   
-  tar_target(
-    global_if,
-    compute_scores_iforest(aug_trip_sample_baked)
-  ),
+  # tar_target(
+  #   global_if,
+  #   compute_scores_iforest(aug_trip_sample_baked)
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # LOF globaux pour aug_trip_sample --------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(global_lofs_k_val, c(10, 20, 30, 40)),
-  tar_target(
-    global_lofs,
-    lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val),
-    pattern = map(global_lofs_k_val),
-    iteration = "list"
-  ),
+  # tar_target(global_lofs_k_val, c(10, 20, 30, 40)),
+  # tar_target(
+  #   global_lofs,
+  #   lof(bake_data_lof(aug_trip_sample), minPts = global_lofs_k_val),
+  #   pattern = map(global_lofs_k_val),
+  #   iteration = "list"
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Un jeu de données pour chaque groupe de prédicteurs -------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    ml_data_class,
-    aug_trip_sample %>% 
-      group_by(vin) %>% 
-      slice(1) %>% 
-      select(vin, class_vars_vec()) %>% 
-      ungroup()
-  ),
+  # tar_target(
+  #   ml_data_class,
+  #   aug_trip_sample %>% 
+  #     group_by(vin) %>% 
+  #     slice(1) %>% 
+  #     select(vin, class_vars_vec()) %>% 
+  #     ungroup()
+  # ),
   
-  tar_target(
-    ml_data_dist,
-    aug_trip_sample %>% 
-      group_by(vin) %>% 
-      summarise(distance = sum(distance)) %>% 
-      ungroup()
-  ),
+  # tar_target(
+  #   ml_data_dist,
+  #   aug_trip_sample %>% 
+  #     group_by(vin) %>% 
+  #     summarise(distance = sum(distance)) %>% 
+  #     ungroup()
+  # ),
   
-  tar_target(
-    ml_data_global_maha,
-    aug_trip_sample %>% 
-      bind_cols(global_maha = global_maha) %>% 
-      compute_stats(group = vin, vars = "global_maha") %>% 
-      rename_with(~ glue("global_maha_{.x}"), -vin)
-  ),
+  # tar_target(
+  #   ml_data_global_maha,
+  #   aug_trip_sample %>% 
+  #     bind_cols(global_maha = global_maha) %>% 
+  #     compute_stats(group = vin, vars = "global_maha") %>% 
+  #     rename_with(~ glue("global_maha_{.x}"), -vin)
+  # ),
   
-  tar_target(
-    ml_data_local_maha,
-    aug_trip_sample %>% 
-      bind_cols(local_maha = local_maha) %>% 
-      compute_stats(group = vin, vars = "local_maha") %>% 
-      rename_with(~ glue("local_maha_{.x}"), -vin)
-  ),
+  # tar_target(
+  #   ml_data_local_maha,
+  #   aug_trip_sample %>% 
+  #     bind_cols(local_maha = local_maha) %>% 
+  #     compute_stats(group = vin, vars = "local_maha") %>% 
+  #     rename_with(~ glue("local_maha_{.x}"), -vin)
+  # ),
   
-  tar_target(
-    ml_data_local_lofs,
-    aug_trip_sample %>% 
-      bind_cols(local_lofs = local_lofs) %>% 
-      compute_stats(group = vin, vars = "local_lofs") %>% 
-      rename_with(~ glue("local_lof_{.x}"), -vin)
-  ),
+  # tar_target(
+  #   ml_data_local_lofs,
+  #   aug_trip_sample %>% 
+  #     bind_cols(local_lofs = local_lofs) %>% 
+  #     compute_stats(group = vin, vars = "local_lofs") %>% 
+  #     rename_with(~ glue("local_lof_{.x}"), -vin)
+  # ),
   
-  tar_target(
-    ml_data_global_lofs,
-    aug_trip_sample %>%
-      bind_cols(global_lofs = global_lofs) %>%
-      compute_stats(group = vin, vars = "global_lofs") %>%
-      rename_with(~ glue("global_lof_{global_lofs_k_val}_{.x}"), -vin),
-    pattern = map(global_lofs, global_lofs_k_val),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   ml_data_global_lofs,
+  #   aug_trip_sample %>%
+  #     bind_cols(global_lofs = global_lofs) %>%
+  #     compute_stats(group = vin, vars = "global_lofs") %>%
+  #     rename_with(~ glue("global_lof_{global_lofs_k_val}_{.x}"), -vin),
+  #   pattern = map(global_lofs, global_lofs_k_val),
+  #   iteration = "list"
+  # ),
   
-  tar_target(
-    ml_data_local_lofs_frac,
-    aug_trip_sample %>%
-      bind_cols(local_lofs_frac = local_lofs_frac) %>%
-      compute_stats(group = vin, vars = "local_lofs_frac") %>%
-      rename_with(~ glue("local_lofs_frac_{frac_grid_local_lofs}_{.x}"), -vin),
-    pattern = map(local_lofs_frac, frac_grid_local_lofs),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   ml_data_local_lofs_frac,
+  #   aug_trip_sample %>%
+  #     bind_cols(local_lofs_frac = local_lofs_frac) %>%
+  #     compute_stats(group = vin, vars = "local_lofs_frac") %>%
+  #     rename_with(~ glue("local_lofs_frac_{frac_grid_local_lofs}_{.x}"), -vin),
+  #   pattern = map(local_lofs_frac, frac_grid_local_lofs),
+  #   iteration = "list"
+  # ),
   
-  tar_target(
-    ml_data_local_if,
-    aug_trip_sample %>% 
-      bind_cols(local_if = unlist(local_if)) %>% 
-      compute_stats(group = vin, vars = "local_if") %>% 
-      rename_with(~ glue("local_if_{.x}"), -vin)
-  ),
+  # tar_target(
+  #   ml_data_local_if,
+  #   aug_trip_sample %>% 
+  #     bind_cols(local_if = unlist(local_if)) %>% 
+  #     compute_stats(group = vin, vars = "local_if") %>% 
+  #     rename_with(~ glue("local_if_{.x}"), -vin)
+  # ),
   
-  tar_target(
-    ml_data_global_if,
-    aug_trip_sample %>% 
-      bind_cols(global_if = global_if) %>% 
-      compute_stats(group = vin, vars = "global_if") %>% 
-      rename_with(~ glue("global_if_{.x}"), -vin)
-  ),
+  # tar_target(
+  #   ml_data_global_if,
+  #   aug_trip_sample %>% 
+  #     bind_cols(global_if = global_if) %>% 
+  #     compute_stats(group = vin, vars = "global_if") %>% 
+  #     rename_with(~ glue("global_if_{.x}"), -vin)
+  # ),
   
-  tar_target(
-    ml_data_response,
-    aug_trip_sample %>% 
-      group_by(vin) %>% 
-      slice(1) %>% 
-      select(vin, "claim_ind_cov_1_2_3_4_5_6") %>% 
-      ungroup()
-  ),
+  # tar_target(
+  #   ml_data_response,
+  #   aug_trip_sample %>% 
+  #     group_by(vin) %>% 
+  #     slice(1) %>% 
+  #     select(vin, "claim_ind_cov_1_2_3_4_5_6") %>% 
+  #     ungroup()
+  # ),
 
   # -----------------------------------------------------------------------------------------------------------------------------
   # Liste de jeux de données pour la classification -----------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    ml_df_ls,
-    list(
-      class = reduce(list(ml_data_class, ml_data_response), left_join, by = "vin"),
-      class_dist = reduce(list(ml_data_class, ml_data_dist, ml_data_response), left_join, by = "vin"),
-      class_dist_global_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_global_maha, ml_data_response), left_join, by = "vin"),
-      class_dist_local_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_local_maha, ml_data_response), left_join, by = "vin"),
-      class_dist_local_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs, ml_data_response), left_join, by = "vin"),
-      class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
-      class_dist_global_20_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 20)]], ml_data_response), left_join, by = "vin"),
-      class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin"),
-      class_dist_global_40_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 40)]], ml_data_response), left_join, by = "vin"),
-      class_dist_local_if = reduce(list(ml_data_class, ml_data_dist, ml_data_local_if, ml_data_response), left_join, by = "vin"),
-      class_dist_global_if = reduce(list(ml_data_class, ml_data_dist, ml_data_global_if, ml_data_response), left_join, by = "vin"),
-      class_dist_local_05_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.05)]], ml_data_response), left_join, by = "vin"),
-      class_dist_local_10_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.1)]], ml_data_response), left_join, by = "vin"),
-      class_dist_local_15_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.15)]], ml_data_response), left_join, by = "vin"),
-      class_dist_local_20_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.2)]], ml_data_response), left_join, by = "vin")
-    ),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   ml_df_ls,
+  #   list(
+  #     class = reduce(list(ml_data_class, ml_data_response), left_join, by = "vin"),
+  #     class_dist = reduce(list(ml_data_class, ml_data_dist, ml_data_response), left_join, by = "vin"),
+  #     class_dist_global_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_global_maha, ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_maha = reduce(list(ml_data_class, ml_data_dist, ml_data_local_maha, ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs, ml_data_response), left_join, by = "vin"),
+  #     class_dist_global_10_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 10)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_global_20_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 20)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_global_30_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 30)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_global_40_lof = reduce(list(ml_data_class, ml_data_dist, ml_data_global_lofs[[which(global_lofs_k_val == 40)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_if = reduce(list(ml_data_class, ml_data_dist, ml_data_local_if, ml_data_response), left_join, by = "vin"),
+  #     class_dist_global_if = reduce(list(ml_data_class, ml_data_dist, ml_data_global_if, ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_05_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.05)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_10_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.1)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_15_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.15)]], ml_data_response), left_join, by = "vin"),
+  #     class_dist_local_20_lofs_frac = reduce(list(ml_data_class, ml_data_dist, ml_data_local_lofs_frac[[which(frac_grid_local_lofs == 0.2)]], ml_data_response), left_join, by = "vin")
+  #   ),
+  #   iteration = "list"
+  # ),
   
-  tar_target(
-    ml_split_ls,
-    {
-      set.seed(2021)
-      initial_split(ml_df_ls, prop = 0.7)
-    },
-    pattern = map(ml_df_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   ml_split_ls,
+  #   {
+  #     set.seed(2021)
+  #     initial_split(ml_df_ls, prop = 0.7)
+  #   },
+  #   pattern = map(ml_df_ls),
+  #   iteration = "list"
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Liste de recettes de prétraitement pour la classification -------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    recettes_ls,
-    recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = training(ml_split_ls)) %>%
-      update_role(vin, new_role = "id") %>%
-      step_other(all_nominal_predictors(), threshold = 0.05) %>%
-      step_lencode_glm(all_nominal_predictors(), outcome = "claim_ind_cov_1_2_3_4_5_6") %>%
-      step_impute_bag(all_predictors()) %>%
-      step_normalize(all_predictors()) %>%
-      step_YeoJohnson(all_predictors()),
-    pattern = map(ml_split_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   recettes_ls,
+  #   recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = training(ml_split_ls)) %>%
+  #     update_role(vin, new_role = "id") %>%
+  #     step_other(all_nominal_predictors(), threshold = 0.05) %>%
+  #     step_lencode_glm(all_nominal_predictors(), outcome = "claim_ind_cov_1_2_3_4_5_6") %>%
+  #     step_impute_bag(all_predictors()) %>%
+  #     step_normalize(all_predictors()) %>%
+  #     step_YeoJohnson(all_predictors()),
+  #   pattern = map(ml_split_ls),
+  #   iteration = "list"
+  # ),
 
   # -----------------------------------------------------------------------------------------------------------------------------
   # Liste de resamples ----------------------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    bootstrap_ls,
-    {
-      set.seed(1994)
-      bootstraps(training(ml_split_ls), times = 50, strata = "claim_ind_cov_1_2_3_4_5_6")
-    },
-    pattern = map(ml_split_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   bootstrap_ls,
+  #   {
+  #     set.seed(1994)
+  #     bootstraps(training(ml_split_ls), times = 50, strata = "claim_ind_cov_1_2_3_4_5_6")
+  #   },
+  #   pattern = map(ml_split_ls),
+  #   iteration = "list"
+  # ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Calibrer et entrainer les modèles -------------------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-  tar_target(
-    glmnet_ls,
-    tune_train_binomial_glmnet(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_ls),
-    pattern = map(ml_split_ls, recettes_ls, bootstrap_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   glmnet_ls,
+  #   tune_train_binomial_glmnet(ml_split_ls, recipe = recettes_ls, resamples = bootstrap_ls),
+  #   pattern = map(ml_split_ls, recettes_ls, bootstrap_ls),
+  #   iteration = "list"
+  # ),
 
   # ----------
   
-  tar_target(
-    glmnet_tuning_ls,
-    glmnet_ls[["tuning"]],
-    pattern = map(glmnet_ls),
-    iteration = "list"
-  ),
+  # tar_target(
+  #   glmnet_tuning_ls,
+  #   glmnet_ls[["tuning"]],
+  #   pattern = map(glmnet_ls),
+  #   iteration = "list"
+  # ),
   
   # ----------
   
-  tar_target(
-    glmnet_last_fit_ls,
-    glmnet_ls[["last_fit"]],
-    pattern = map(glmnet_ls),
-    iteration = "list"
-  )
+  # tar_target(
+  #   glmnet_last_fit_ls,
+  #   glmnet_ls[["last_fit"]],
+  #   pattern = map(glmnet_ls),
+  #   iteration = "list"
+  # )
   
   # =============================================================================================================================
 )
