@@ -273,6 +273,7 @@ list(
       step_pca(all_numeric_predictors(), threshold = 0.95)
   ),
   
+  # ----------
   
   tar_target(local_lof_grid, seq(0.05, 0.5, by = 0.05)),
   tar_target(
@@ -281,6 +282,16 @@ list(
     pattern = map(local_lof_grid),
     iteration = "list"
   ),
+  
+  tar_target(global_lof_grid, seq(5, 50, by = 5)),
+  tar_target(
+    global_lof_train,
+    compute_global_lofs(aug_trip_sample_train, k = global_lof_grid),
+    pattern = map(global_lof_grid),
+    iteration = "list"
+  ),
+  
+  # ----------
   
   tar_target(
     local_lof_train_ml,
@@ -292,13 +303,24 @@ list(
     iteration = "list"
   ),
   
-  tar_target(global_lof_grid, seq(5, 50, by = 5)),
   tar_target(
-    global_lof_train,
-    compute_global_lofs(aug_trip_sample_train, k = global_lof_grid),
-    pattern = map(global_lof_grid),
+    global_lof_train_ml,
+    aug_trip_sample_train %>% 
+      bind_cols(local_lof = global_lof_train) %>% 
+      compute_percentiles(vars = "global_lof") %>% 
+      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
+    pattern = map(global_lof_train),
+    iteration = "list"
+  ),
+  
+  tar_target(
+    local_lof_tune,
+    cv_logreg(local_lof_train_ml, recipe = recipe_tune_anomaly),
+    pattern = map(local_lof_train_ml),
     iteration = "list"
   )
+  
+
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Distance de Mahalanobis pour aug_trip_sample --------------------------------------------------------------------------------
