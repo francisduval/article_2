@@ -306,7 +306,7 @@ list(
   tar_target(
     global_lof_train_ml,
     aug_trip_sample_train %>% 
-      bind_cols(local_lof = global_lof_train) %>% 
+      bind_cols(global_lof = global_lof_train) %>% 
       compute_percentiles(vars = "global_lof") %>% 
       bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
     pattern = map(global_lof_train),
