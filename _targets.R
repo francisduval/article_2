@@ -265,6 +265,15 @@ list(
   # Choix des paramètres pour les méthodes de détection d'anomalies ------------------------------------------------------------- 
   # -----------------------------------------------------------------------------------------------------------------------------
   
+  tar_target(
+    recipe_tune_anomaly,
+    recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = local_lof_train_ml[[1]]) %>%
+      update_role(vin, new_role = "id") %>%
+      step_normalize(all_predictors()) %>% 
+      step_pca(all_numeric_predictors(), threshold = 0.95)
+  ),
+  
+  
   tar_target(local_lof_grid, seq(0.05, 0.5, by = 0.05)),
   tar_target(
     local_lof_train,
