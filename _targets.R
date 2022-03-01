@@ -246,6 +246,9 @@ list(
   
   tar_target(aug_trip_sample_train, filter(augmented_trip_data, vin %in% train_test_vins$train)),
   tar_target(aug_trip_sample_test, filter(augmented_trip_data, vin %in% train_test_vins$test)),
+  
+  tar_target(ml_data_train, create_ml_data(aug_trip_sample_train)),
+  tar_target(ml_data_test, create_ml_data(aug_trip_sample_test)),
 
   tar_target(
     aug_trip_sample,
@@ -267,6 +270,16 @@ list(
     local_lof_train,
     compute_local_lofs(aug_trip_sample_train, k_frac = local_lof_grid),
     pattern = map(local_lof_grid),
+    iteration = "list"
+  ),
+  
+  tar_target(
+    local_lof_train_ml,
+    aug_trip_sample_train %>% 
+      bind_cols(local_lof = local_lof_train) %>% 
+      compute_percentiles(vars = "local_lof") %>% 
+      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
+    pattern = map(local_lof_train),
     iteration = "list"
   ),
   
