@@ -291,7 +291,7 @@ list(
     iteration = "list"
   ),
   
-  tar_target(local_if_grid, seq(0.05, 0.1, by = 0.05)),
+  tar_target(local_if_grid, seq(0.05, 0.5, by = 0.05)),
   tar_target(
     local_if_train,
     compute_local_if(aug_trip_sample_train, k_frac = local_if_grid),
@@ -318,6 +318,16 @@ list(
       compute_percentiles(vars = "global_lof") %>% 
       bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
     pattern = map(global_lof_train),
+    iteration = "list"
+  ),
+  
+  tar_target(
+    local_if_train_ml,
+    aug_trip_sample_train %>% 
+      bind_cols(local_if = local_if_train) %>% 
+      compute_percentiles(vars = "local_if") %>% 
+      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
+    pattern = map(local_if_train),
     iteration = "list"
   ),
   
