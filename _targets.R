@@ -345,6 +345,13 @@ list(
     cv_logreg(global_lof_train_ml, recipe = recipe_tune_anomaly),
     pattern = map(global_lof_train_ml),
     iteration = "list"
+  ),
+  
+  tar_target(
+    local_if_tune,
+    cv_logreg(local_if_train_ml, recipe = recipe_tune_anomaly),
+    pattern = map(local_if_train_ml),
+    iteration = "list"
   )
   
 
