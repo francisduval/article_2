@@ -339,6 +339,16 @@ list(
     iteration = "list"
   ),
   
+  tar_target(
+    global_if_train_ml,
+    aug_trip_sample_train %>% 
+      bind_cols(global_if = global_if_train) %>% 
+      compute_percentiles(vars = "global_if") %>% 
+      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
+    pattern = map(global_if_train),
+    iteration = "list"
+  ),
+  
   # ----------
   
   tar_target(
