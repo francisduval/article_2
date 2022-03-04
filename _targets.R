@@ -291,7 +291,7 @@ list(
     iteration = "list"
   ),
   
-  tar_target(local_if_grid, seq(0.05, 0.5, by = 0.05)),
+  tar_target(local_if_grid, seq(0.05, 1, by = 0.05)),
   tar_target(
     local_if_train,
     compute_local_if(aug_trip_sample_train, k_frac = local_if_grid),
