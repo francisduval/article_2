@@ -299,6 +299,14 @@ list(
     iteration = "list"
   ),
   
+  tar_target(global_if_grid, seq(100, 400, by = 100)),
+  tar_target(
+    global_if_train,
+    compute_global_if(aug_trip_sample_train, sample_size = global_if_grid),
+    pattern = map(global_if_grid),
+    iteration = "list"
+  ),
+  
   # ----------
   
   tar_target(
