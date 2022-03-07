@@ -275,6 +275,11 @@ list(
   
   # ----------
   
+  tar_target(
+    local_maha,
+    compute_local_maha(aug_trip_sample_train)
+  ),
+  
   tar_target(local_lof_grid, seq(0.05, 0.6, by = 0.05)),
   tar_target(
     local_lof_train,
