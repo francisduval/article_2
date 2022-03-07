@@ -378,6 +378,16 @@ list(
   # ----------
   
   tar_target(
+    local_maha_tune,
+    cv_logreg(local_maha_train_ml, recipe = recipe_tune_anomaly)
+  ),
+  
+  tar_target(
+    global_maha_tune,
+    cv_logreg(global_maha_train_ml, recipe = recipe_tune_anomaly)
+  ),
+  
+  tar_target(
     local_lof_tune,
     cv_logreg(local_lof_train_ml, recipe = recipe_tune_anomaly),
     pattern = map(local_lof_train_ml),
