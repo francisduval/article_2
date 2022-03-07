@@ -275,7 +275,7 @@ list(
   
   # ----------
   
-  tar_target(local_lof_grid, seq(0.05, 0.5, by = 0.05)),
+  tar_target(local_lof_grid, seq(0.05, 0.6, by = 0.05)),
   tar_target(
     local_lof_train,
     compute_local_lofs(aug_trip_sample_train, k_frac = local_lof_grid),
@@ -299,7 +299,7 @@ list(
     iteration = "list"
   ),
   
-  tar_target(global_if_grid, seq(100, 400, by = 100)),
+  tar_target(global_if_grid, 2^seq(6, 10)),
   tar_target(
     global_if_train,
     compute_global_if(aug_trip_sample_train, sample_size = global_if_grid),
@@ -378,8 +378,6 @@ list(
     pattern = map(global_if_train_ml),
     iteration = "list"
   )
-  
-
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Distance de Mahalanobis pour aug_trip_sample --------------------------------------------------------------------------------
