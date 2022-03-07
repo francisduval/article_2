@@ -324,9 +324,7 @@ list(
     aug_trip_sample_train %>% 
       bind_cols(local_maha = local_maha_train) %>% 
       compute_percentiles(vars = "local_maha") %>% 
-      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
-    pattern = map(local_maha_train),
-    iteration = "list"
+      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6)
   ),
   
   tar_target(
@@ -334,9 +332,7 @@ list(
     aug_trip_sample_train %>% 
       bind_cols(global_maha = global_maha_train) %>% 
       compute_percentiles(vars = "global_maha") %>% 
-      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
-    pattern = map(global_maha_train),
-    iteration = "list"
+      bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6)
   ),
   
   tar_target(
