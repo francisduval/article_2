@@ -432,7 +432,15 @@ list(
   # -----------------------------------------------------------------------------------------------------------------------------
   # Jeu de données training classique + distance + anomalie optimale ------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
-    
+  
+  tar_target(
+    class_dist_train_ml,
+    ml_data_train %>% 
+      left_join(distance_train, by = "vin")
+  ),
+  
+  # ----------
+  
   tar_target(
     local_maha_class_dist_train_ml,
     select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
@@ -504,6 +512,13 @@ list(
   tar_target(tune_en_global_lof, tune_en(global_lof_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_local_if, tune_en(local_if_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_global_if, tune_en(global_if_class_dist_train_ml, recipe = rec_en))
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Entrainer les modèles optimaux sur l'ensemble d'entrainement ----------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  
+  
   
   
   # -----------------------------------------------------------------------------------------------------------------------------
