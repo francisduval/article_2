@@ -504,8 +504,20 @@ list(
       step_normalize(all_predictors())
   ),
   
+  tar_target(
+    rec_en_class_dist,
+    recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = class_dist_train_ml) %>%
+      update_role(vin, new_role = "id") %>%
+      step_other(all_nominal_predictors(), threshold = 0.05) %>%
+      step_lencode_glm(all_nominal_predictors(), outcome = "claim_ind_cov_1_2_3_4_5_6") %>%
+      step_impute_bag(commute_distance, years_claim_free) %>%
+      step_YeoJohnson(all_predictors()) %>% 
+      step_normalize(all_predictors())
+  ),
+  
   # ----------
   
+  tar_target(tune_en_class_dist, tune_en(class_dist_train_ml, recipe = rec_en_class_dist)),
   tar_target(tune_en_local_maha, tune_en(local_maha_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_gobal_maha, tune_en(global_maha_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_local_lof, tune_en(local_lof_class_dist_train_ml, recipe = rec_en)),
