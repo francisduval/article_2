@@ -249,6 +249,20 @@ list(
   
   tar_target(ml_data_train, create_ml_data(aug_trip_sample_train)),
   tar_target(ml_data_test, create_ml_data(aug_trip_sample_test)),
+  
+  tar_target(
+    distance_train,
+    aug_trip_sample_train %>% 
+      group_by(vin) %>% 
+      summarise(distance = sum(distance))
+  ),
+  
+  tar_target(
+    distance_test,
+    aug_trip_sample_test %>% 
+      group_by(vin) %>% 
+      summarise(distance = sum(distance))
+  ),
 
   tar_target(
     aug_trip_sample,
@@ -416,12 +430,14 @@ list(
   ),
 
   # -----------------------------------------------------------------------------------------------------------------------------
-  # Jeu de données training classique + anomalie optimale -----------------------------------------------------------------------
+  # Jeu de données training classique + distance + anomalie optimale ------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
     
   tar_target(
     local_maha_class_train_ml,
-    left_join(select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6), local_maha_train_ml, by = "vin")
+    select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
+      left_join(distance_train, by = "vin") %>% 
+      left_join(local_maha_train_ml, by = "vin")
   )
   
   # -----------------------------------------------------------------------------------------------------------------------------
