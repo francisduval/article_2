@@ -447,6 +447,8 @@ list(
       left_join(global_maha_train_ml, by = "vin")
   ),
   
+  # ----------
+  
   tar_target(
     local_lof_class_dist_train_ml,
     select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
@@ -460,6 +462,8 @@ list(
       left_join(distance_train, by = "vin") %>% 
       left_join(global_lof_train_ml[[which.max(map(global_lof_tune, "mean"))]], by = "vin")
   ),
+  
+  # ----------
   
   tar_target(
     local_if_class_dist_train_ml,
@@ -485,11 +489,21 @@ list(
       update_role(vin, new_role = "id") %>%
       step_other(all_nominal_predictors(), threshold = 0.05) %>%
       step_lencode_glm(all_nominal_predictors(), outcome = "claim_ind_cov_1_2_3_4_5_6") %>%
-      step_impute_bag(commute_distance) %>%
+      step_impute_bag(commute_distance, years_claim_free) %>%
       step_YeoJohnson(all_predictors()) %>% 
       step_normalize(all_predictors()) %>% 
-      step_pca(q_0:q_100, threshold = 0.95)
-  )
+      step_pca(q_0:q_100, threshold = 0.95) %>% 
+      step_normalize(all_predictors())
+  ),
+  
+  # ----------
+  
+  tar_target(tune_en_local_maha, tune_en(local_maha_class_dist_train_ml, recipe = rec_en)),
+  tar_target(tune_en_gobal_maha, tune_en(global_maha_class_dist_train_ml, recipe = rec_en)),
+  tar_target(tune_en_local_lof, tune_en(local_lof_class_dist_train_ml, recipe = rec_en)),
+  tar_target(tune_en_global_lof, tune_en(global_lof_class_dist_train_ml, recipe = rec_en)),
+  tar_target(tune_en_local_if, tune_en(local_if_class_dist_train_ml, recipe = rec_en)),
+  tar_target(tune_en_global_if, tune_en(global_if_class_dist_train_ml, recipe = rec_en))
   
   
   # -----------------------------------------------------------------------------------------------------------------------------
