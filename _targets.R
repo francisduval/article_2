@@ -473,13 +473,23 @@ list(
     select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
       left_join(distance_train, by = "vin") %>% 
       left_join(global_if_train_ml[[which.max(map(global_if_tune, "mean"))]], by = "vin")
-  )
+  ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Calibrer les hyperparamètres du elastic-net ---------------------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
-
+  tar_target(
+    rec_en,
+      recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = local_maha_class_dist_train_ml) %>%
+      update_role(vin, new_role = "id") %>%
+      step_other(all_nominal_predictors(), threshold = 0.05) %>%
+      step_lencode_glm(all_nominal_predictors(), outcome = "claim_ind_cov_1_2_3_4_5_6") %>%
+      step_impute_bag(commute_distance) %>%
+      step_YeoJohnson(all_predictors()) %>% 
+      step_normalize(all_predictors()) %>% 
+      step_pca(q_0:q_100, threshold = 0.95)
+  )
   
   
   # -----------------------------------------------------------------------------------------------------------------------------
