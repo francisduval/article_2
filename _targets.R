@@ -434,10 +434,45 @@ list(
   # -----------------------------------------------------------------------------------------------------------------------------
     
   tar_target(
-    local_maha_class_train_ml,
+    local_maha_class_dist_train_ml,
     select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
       left_join(distance_train, by = "vin") %>% 
       left_join(local_maha_train_ml, by = "vin")
+  ),
+  
+  tar_target(
+    global_maha_class_dist_train_ml,
+    select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
+      left_join(distance_train, by = "vin") %>% 
+      left_join(global_maha_train_ml, by = "vin")
+  ),
+  
+  tar_target(
+    local_lof_class_dist_train_ml,
+    select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
+      left_join(distance_train, by = "vin") %>% 
+      left_join(local_lof_train_ml[[which.max(map(local_lof_tune, "mean"))]], by = "vin")
+  ),
+  
+  tar_target(
+    global_lof_class_dist_train_ml,
+    select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
+      left_join(distance_train, by = "vin") %>% 
+      left_join(global_lof_train_ml[[which.max(map(global_lof_tune, "mean"))]], by = "vin")
+  ),
+  
+  tar_target(
+    local_if_class_dist_train_ml,
+    select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
+      left_join(distance_train, by = "vin") %>% 
+      left_join(local_if_train_ml[[which.max(map(local_if_tune, "mean"))]], by = "vin")
+  ),
+  
+  tar_target(
+    global_if_class_dist_train_ml,
+    select(ml_data_train, -claim_ind_cov_1_2_3_4_5_6) %>% 
+      left_join(distance_train, by = "vin") %>% 
+      left_join(global_if_train_ml[[which.max(map(global_if_tune, "mean"))]], by = "vin")
   )
   
   # -----------------------------------------------------------------------------------------------------------------------------
