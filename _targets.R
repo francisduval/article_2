@@ -274,20 +274,19 @@ list(
     bake_data_lof(aug_trip_sample)
   ),
   
+
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Grilles de calibration des méthodes de détection d'anomalies ---------------------------------------------------------------- 
+  # -----------------------------------------------------------------------------------------------------------------------------
+    
+  tar_target(local_lof_grid, seq(0.05, 0.6, by = 0.05)),
+  tar_target(global_lof_grid, seq(5, 50, by = 5)),
+  tar_target(local_if_grid, seq(0.05, 1, by = 0.05)),
+  tar_target(global_if_grid, 2^seq(6, 10)),
   
   # -----------------------------------------------------------------------------------------------------------------------------
-  # Choix des paramètres pour les méthodes de détection d'anomalies ------------------------------------------------------------- 
+  # Listes de vecteurs de scores d'anomalies (un vecteur pour chaque méthode-paramètre) ----------------------------------------- 
   # -----------------------------------------------------------------------------------------------------------------------------
-  
-  tar_target(
-    recipe_tune_anomaly,
-    recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = local_lof_train_ml[[1]]) %>%
-      update_role(vin, new_role = "id") %>%
-      step_normalize(all_predictors()) %>% 
-      step_pca(all_numeric_predictors(), threshold = 0.95)
-  ),
-  
-  # ----------
   
   tar_target(
     local_maha_train,
@@ -299,7 +298,6 @@ list(
     compute_global_maha(aug_trip_sample_train)
   ),
   
-  tar_target(local_lof_grid, seq(0.05, 0.6, by = 0.05)),
   tar_target(
     local_lof_train,
     compute_local_lofs(aug_trip_sample_train, k_frac = local_lof_grid),
@@ -307,7 +305,6 @@ list(
     iteration = "list"
   ),
   
-  tar_target(global_lof_grid, seq(5, 50, by = 5)),
   tar_target(
     global_lof_train,
     compute_global_lofs(aug_trip_sample_train, k = global_lof_grid),
@@ -315,7 +312,6 @@ list(
     iteration = "list"
   ),
   
-  tar_target(local_if_grid, seq(0.05, 1, by = 0.05)),
   tar_target(
     local_if_train,
     compute_local_if(aug_trip_sample_train, k_frac = local_if_grid),
@@ -323,13 +319,16 @@ list(
     iteration = "list"
   ),
   
-  tar_target(global_if_grid, 2^seq(6, 10)),
   tar_target(
     global_if_train,
     compute_global_if(aug_trip_sample_train, sample_size = global_if_grid),
     pattern = map(global_if_grid),
     iteration = "list"
   ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Jeux de données d'entrainement avec seulement les scores d'anomalie (pas de variables classiques et distance) --------------- 
+  # -----------------------------------------------------------------------------------------------------------------------------
   
   # Mahalanobis -----------------------------------------------------------------------------------------------------------------
   
@@ -391,6 +390,18 @@ list(
       bind_cols(claim_ind_cov_1_2_3_4_5_6 = ml_data_train$claim_ind_cov_1_2_3_4_5_6),
     pattern = map(global_if_train),
     iteration = "list"
+  ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Faire la validation croisée pour déterminer le meilleur paramètre pour chaque méthode --------------------------------------- 
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    recipe_tune_anomaly,
+    recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = local_lof_train_ml[[1]]) %>%
+      update_role(vin, new_role = "id") %>%
+      step_normalize(all_predictors()) %>% 
+      step_pca(all_numeric_predictors(), threshold = 0.95)
   ),
   
   # Mahalanobis -----------------------------------------------------------------------------------------------------------------
