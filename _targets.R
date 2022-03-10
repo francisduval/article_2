@@ -519,16 +519,92 @@ list(
   
   tar_target(tune_en_class_dist, tune_en(class_dist_train_ml, recipe = rec_en_class_dist)),
   tar_target(tune_en_local_maha, tune_en(local_maha_class_dist_train_ml, recipe = rec_en)),
-  tar_target(tune_en_gobal_maha, tune_en(global_maha_class_dist_train_ml, recipe = rec_en)),
+  tar_target(tune_en_global_maha, tune_en(global_maha_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_local_lof, tune_en(local_lof_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_global_lof, tune_en(global_lof_class_dist_train_ml, recipe = rec_en)),
   tar_target(tune_en_local_if, tune_en(local_if_class_dist_train_ml, recipe = rec_en)),
-  tar_target(tune_en_global_if, tune_en(global_if_class_dist_train_ml, recipe = rec_en))
+  tar_target(tune_en_global_if, tune_en(global_if_class_dist_train_ml, recipe = rec_en)),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Entrainer les modèles optimaux sur l'ensemble d'entrainement ----------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
+  tar_target(
+    fit_class_dist, 
+    fit_en(
+      data = class_dist_train_ml, 
+      recipe = rec_en_class_dist,
+      penalty = select_best(tune_en_class_dist, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_class_dist, metric = "roc_auc")$mixture
+    )
+  ),
+  
+  # ----------
+  
+  tar_target(
+    fit_local_maha_class_dist, 
+    fit_en(
+      data = local_maha_class_dist_train_ml, 
+      recipe = rec_en,
+      penalty = select_best(tune_en_local_maha, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_local_maha, metric = "roc_auc")$mixture
+    )
+  ),
+  
+  tar_target(
+    fit_global_maha_class_dist, 
+    fit_en(
+      data = global_maha_class_dist_train_ml, 
+      recipe = rec_en,
+      penalty = select_best(tune_en_global_maha, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_global_maha, metric = "roc_auc")$mixture
+    )
+  ),
+  
+  # ----------
+  
+  tar_target(
+    fit_local_lof_class_dist, 
+    fit_en(
+      data = local_lof_class_dist_train_ml, 
+      recipe = rec_en,
+      penalty = select_best(tune_en_local_lof, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_local_lof, metric = "roc_auc")$mixture
+    )
+  ),
+  
+  tar_target(
+    fit_global_lof_class_dist, 
+    fit_en(
+      data = global_lof_class_dist_train_ml, 
+      recipe = rec_en,
+      penalty = select_best(tune_en_global_lof, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_global_lof, metric = "roc_auc")$mixture
+    )
+  ),
+  
+  # ----------
+  
+  tar_target(
+    fit_local_if_class_dist, 
+    fit_en(
+      data = local_if_class_dist_train_ml, 
+      recipe = rec_en,
+      penalty = select_best(tune_en_local_if, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_local_if, metric = "roc_auc")$mixture
+    )
+  ),
+  
+  tar_target(
+    fit_global_if_class_dist, 
+    fit_en(
+      data = global_if_class_dist_train_ml, 
+      recipe = rec_en,
+      penalty = select_best(tune_en_global_if, metric = "roc_auc")$penalty,
+      mixture = select_best(tune_en_global_if, metric = "roc_auc")$mixture
+    )
+  ),
+
   # -----------------------------------------------------------------------------------------------------------------------------
   # Calcul des scores d'anomalie optimaux sur ensemble test ---------------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
