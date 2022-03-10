@@ -529,6 +529,17 @@ list(
   # Entrainer les modèles optimaux sur l'ensemble d'entrainement ----------------------------------------------------------------
   # -----------------------------------------------------------------------------------------------------------------------------
   
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Calcul des scores d'anomalie optimaux sur ensemble test ---------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(local_maha_test, compute_local_maha(aug_trip_sample_test)),
+  tar_target(global_maha_test, compute_global_maha(aug_trip_sample_test)),
+  tar_target(local_lof_test, compute_local_lofs(aug_trip_sample_test, k_frac = local_lof_grid[which.max(map(local_lof_tune, "mean"))])),
+  tar_target(global_lof_test, compute_global_lofs(aug_trip_sample_test, k = global_lof_grid[which.max(map(global_lof_tune, "mean"))])),
+  tar_target(local_if_test, compute_local_if(aug_trip_sample_test, k_frac = local_if_grid[which.max(map(local_if_tune, "mean"))])),
+  tar_target(global_if_test, compute_global_if(aug_trip_sample_test, sample_size = global_if_grid[which.max(map(global_if_tune, "mean"))]))
+  
   
   
   
