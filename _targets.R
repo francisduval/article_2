@@ -246,6 +246,7 @@ list(
   
   tar_target(aug_trip_sample_train, filter(augmented_trip_data, vin %in% train_test_vins$train)),
   tar_target(aug_trip_sample_test, filter(augmented_trip_data, vin %in% train_test_vins$test)),
+  tar_target(aug_trip_sample_complete, bind_rows(aug_trip_sample_train, aug_trip_sample_test)),
   
   tar_target(ml_data_train, create_ml_data(aug_trip_sample_train)),
   tar_target(ml_data_test, create_ml_data(aug_trip_sample_test)),
@@ -629,11 +630,29 @@ list(
   # -----------------------------------------------------------------------------------------------------------------------------
   
   tar_target(local_maha_test, compute_local_maha(aug_trip_sample_test)),
-  tar_target(global_maha_test, compute_global_maha(aug_trip_sample_test)),
   tar_target(local_lof_test, compute_local_lofs(aug_trip_sample_test, k_frac = local_lof_grid[which.max(map(local_lof_tune, "mean"))])),
-  tar_target(global_lof_test, compute_global_lofs(aug_trip_sample_test, k = global_lof_grid[which.max(map(global_lof_tune, "mean"))])),
   tar_target(local_if_test, compute_local_if(aug_trip_sample_test, k_frac = local_if_grid[which.max(map(local_if_tune, "mean"))])),
-  tar_target(global_if_test, compute_global_if(aug_trip_sample_test, sample_size = global_if_grid[which.max(map(global_if_tune, "mean"))])),
+  
+  tar_target(global_maha_test,
+    aug_trip_sample_complete %>% 
+      mutate(global_maha = compute_global_maha(aug_trip_sample_complete)) %>% 
+      filter(vin %in% train_test_vins$test) %>% 
+      pull(global_maha)
+  ),
+  
+  tar_target(global_lof_test,
+    aug_trip_sample_complete %>% 
+      mutate(global_lof = compute_global_lofs(aug_trip_sample_complete, k = global_lof_grid[which.max(map(global_lof_tune, "mean"))])) %>% 
+      filter(vin %in% train_test_vins$test) %>% 
+      pull(global_lof)
+  ),
+  
+  tar_target(global_if_test,
+    aug_trip_sample_complete %>% 
+      mutate(global_if = compute_global_if(aug_trip_sample_complete, sample_size = global_if_grid[which.max(map(global_if_tune, "mean"))])) %>% 
+      filter(vin %in% train_test_vins$test) %>% 
+      pull(global_if)
+  ),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Jeux de données test --------------------------------------------------------------------------------------------------------
@@ -702,6 +721,23 @@ list(
       compute_percentiles(vars = "global_if") %>% 
       left_join(distance_test, by = "vin") %>% 
       left_join(ml_data_test, by = "vin")
+  ),
+  
+  # -----------------------------------------------------------------------------------------------------------------------------
+  # Résultats sur le jeu de données test ----------------------------------------------------------------------------------------
+  # -----------------------------------------------------------------------------------------------------------------------------
+  
+  tar_target(
+    test_results,
+    list(
+      class_dist = test_en(fit_class_dist, new_data = class_dist_test_ml),
+      local_maha_class_dist = test_en(fit_local_maha_class_dist, new_data = local_maha_class_dist_test_ml),
+      global_maha_class_dist = test_en(fit_global_maha_class_dist, new_data = global_maha_class_dist_test_ml),
+      local_lof_class_dist = test_en(fit_local_lof_class_dist, new_data = local_lof_class_dist_test_ml),
+      global_lof_class_dist = test_en(fit_global_lof_class_dist, new_data = global_lof_class_dist_test_ml),
+      local_if_class_dist = test_en(fit_local_if_class_dist, new_data = local_if_class_dist_test_ml),
+      global_if_class_dist = test_en(fit_global_if_class_dist, new_data = global_if_class_dist_test_ml)
+    )
   )
   
   # =============================================================================================================================
