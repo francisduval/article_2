@@ -283,7 +283,7 @@ list(
   tar_target(local_lof_grid, seq(0.05, 0.6, by = 0.05)),
   tar_target(global_lof_grid, seq(5, 50, by = 5)),
   tar_target(local_if_grid, seq(0.05, 1, by = 0.05)),
-  tar_target(global_if_grid, 2^seq(6, 10)),
+  tar_target(global_if_grid, seq(100, 1000, by = 100)),
   
   # -----------------------------------------------------------------------------------------------------------------------------
   # Listes de vecteurs de scores d'anomalies (un vecteur pour chaque méthode-paramètre) ----------------------------------------- 
@@ -402,7 +402,7 @@ list(
     recipe(claim_ind_cov_1_2_3_4_5_6 ~ ., data = local_lof_train_ml[[1]]) %>%
       update_role(vin, new_role = "id") %>%
       step_normalize(all_predictors()) %>% 
-      step_pca(all_numeric_predictors(), threshold = 0.95)
+      step_pca(all_numeric_predictors(), threshold = 0.99)
   ),
   
   # Mahalanobis -----------------------------------------------------------------------------------------------------------------
@@ -534,7 +534,7 @@ list(
       step_impute_bag(commute_distance, years_claim_free) %>%
       step_YeoJohnson(all_predictors()) %>% 
       step_normalize(all_predictors()) %>% 
-      step_pca(q_0:q_100, threshold = 0.95) %>% 
+      step_pca(q_0:q_100, threshold = 0.99) %>% 
       step_normalize(all_predictors())
   ),
   
@@ -644,8 +644,8 @@ list(
   # -----------------------------------------------------------------------------------------------------------------------------
   
   tar_target(local_maha_test, compute_local_maha(aug_trip_sample_test)),
-  tar_target(local_lof_test, compute_local_lofs(aug_trip_sample_test, k_frac = local_lof_grid[which.max(map(local_lof_tune, "mean"))])),
-  tar_target(local_if_test, compute_local_if(aug_trip_sample_test, k_frac = local_if_grid[which.max(map(local_if_tune, "mean"))])),
+  tar_target(local_lof_test, compute_local_lofs(aug_trip_sample_test, k_frac = best_params_anomaly$local_lof)),
+  tar_target(local_if_test, compute_local_if(aug_trip_sample_test, k_frac = best_params_anomaly$local_if)),
   
   tar_target(global_maha_test,
     aug_trip_sample_complete %>% 
@@ -656,14 +656,14 @@ list(
   
   tar_target(global_lof_test,
     aug_trip_sample_complete %>% 
-      mutate(global_lof = compute_global_lofs(aug_trip_sample_complete, k = global_lof_grid[which.max(map(global_lof_tune, "mean"))])) %>% 
+      mutate(global_lof = compute_global_lofs(aug_trip_sample_complete, k = best_params_anomaly$global_lof)) %>% 
       filter(vin %in% train_test_vins$test) %>% 
       pull(global_lof)
   ),
   
   tar_target(global_if_test,
     aug_trip_sample_complete %>% 
-      mutate(global_if = compute_global_if(aug_trip_sample_complete, sample_size = global_if_grid[which.max(map(global_if_tune, "mean"))])) %>% 
+      mutate(global_if = compute_global_if(aug_trip_sample_complete, sample_size = best_params_anomaly$global_if)) %>% 
       filter(vin %in% train_test_vins$test) %>% 
       pull(global_if)
   ),
