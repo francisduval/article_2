@@ -1,0 +1,19 @@
+make_trip_related_vars_vec <- function() {
+  c(
+    "trip_number",
+    "datetime_start",
+    "datetime_end",
+    "duration", 
+    "date_start",
+    "date_end",
+    "distance",
+    "avg_speed",
+    "max_speed",
+    "cos_time_start",
+    "sin_time_start",
+    "nb_days_since_monday",
+    "cos_nb_days_since_monday",
+    "sin_nb_days_since_monday",
+    "weekday"
+  )
+}

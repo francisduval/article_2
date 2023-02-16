@@ -1,0 +1,384 @@
+---
+title: "LOFs globaux"
+author: "Francis Duval"
+date: "10/12/2021"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = F,
+	warning = F
+)
+```
+
+```{r, results = "hide"}
+purrr::walk(fs::dir_ls("R"), source)
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(rsample)
+library(lubridate)
+library(qs)
+library(fastDummies)
+library(here)
+library(dtplyr)
+library(hms)
+library(fs)
+library(embed)
+library(glmnet)
+library(glue)
+library(dbscan)
+library(e1071)
+library(ranger)
+theme_set(theme_bw())
+```
+
+
+```{r}
+ml_data_global_lofs <- tar_read(ml_data_global_lofs)
+ml_data_response <- tar_read(ml_data_response)
+ml_data_class <- tar_read(ml_data_class)
+ml_data_dist <- tar_read(ml_data_dist)
+
+ml_data_global_lofs_30 <- ml_data_global_lofs[[which(tar_read(global_lofs_k_val) == 30)]]
+```
+
+```{r}
+ml_data <- 
+  ml_data_global_lofs_30 %>% 
+  left_join(ml_data_class, by = "vin") %>% 
+  left_join(ml_data_dist, by = "vin") %>% 
+  left_join(ml_data_response, by = "vin")
+```
+
+
+# LOFs globaux (k = 30) -- Réclamants versus non-réclamants
+
+## Distributions des statistiques reliées aux LOFs {.tabset .tabset-pills}
+
+On va regarder si la distribution des statistiques calculées est différente pour les réclamants et les non-réclamants.
+
+```{r}
+plot_density <- function(data, var) {
+  xlim <- quantile(data[[quo_name(enquo(var))]], probs = c(0.01, 0.99), na.rm = T)
+  
+  data %>% 
+    ggplot(aes(x = {{var}}, fill = claim_ind_cov_1_2_3_4_5_6)) +
+    geom_density(color = "#e9ecef", alpha = 0.4) +
+    scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+    ylab("Densité") +
+    xlab(NULL) +
+    xlim(xlim)
+}
+```
+
+### Mean {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_mean)
+```
+
+### Variance {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_var)
+```
+
+### Skewness {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_skewness)
+```
+
+### Kurtosis {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_kurtosis)
+```
+
+### Quantile 0.01 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q01)
+```
+
+### Quantile 0.05 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q05)
+```
+
+### Quantile 0.25 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q25)
+```
+
+### Quantile 0.50 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q50)
+```
+
+### Quantile 0.75 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q75)
+```
+
+### Quantile 0.95 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q95)
+```
+
+### Quantile 0.99 {-}
+```{r}
+plot_density(ml_data, var = global_lof_30_q99)
+```
+
+### Âge du véhicule (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = veh_age)
+```
+
+### Nombre d'années depuis la dernière réclamation (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = years_claim_free)
+```
+
+### Distance annuelle déclarée (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = annual_distance)
+```
+
+### Distance annuelle réelle (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = distance)
+```
+
+# Routnier vs pas routinier {.tabset .tabset-pills}
+
+Ici, je pige plusieurs paires de routinier/non-routinier parmi les conducteurs de l'échantillon. La sélection des paires est faite en regardant l'histogramme de l'heure de départ des trajets.
+
+```{r}
+aug_trip_sample <- tar_read(aug_trip_sample)
+global_lofs <- tar_read(global_lofs)
+
+global_lofs_30 <- global_lofs[[which(tar_read(global_lofs_k_val) == 30)]]
+```
+
+```{r}
+aug_trip_sample_global_lofs_30 <- bind_cols(aug_trip_sample, global_lofs_30 = global_lofs_30)
+```
+
+
+```{r}
+plot_hist_time <- function(data, sub = NULL) {
+  ggplot(data, aes(x = time_start)) +
+    geom_histogram(binwidth = 900, col = "black", fill = "white") +
+    xlab("Heure") +
+    ylab("Nombre de trajets") +
+    labs(subtitle = sub)
+}
+```
+
+## Première paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_global_lofs_30, vin == "1C4PJMCS2GW172098")
+pas_routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA56642A801987")
+
+lof_routinier <- tibble(global_lofs_30 = routinier$global_lofs_30, vin = "routinier")
+lof_pas_routinier <- tibble(global_lofs_30 = pas_routinier$global_lofs_30, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(lof_routinier, lof_pas_routinier) %>%
+  ggplot(aes(x = global_lofs_30, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Local outlier factor", limits = c(0.93, 1.3)) +
+  ylab("Densité")
+```
+
+## Deuxième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA66238A803564")
+pas_routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA66246A800508")
+
+lof_routinier <- tibble(global_lofs_30 = routinier$global_lofs_30, vin = "routinier")
+lof_pas_routinier <- tibble(global_lofs_30 = pas_routinier$global_lofs_30, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(lof_routinier, lof_pas_routinier) %>%
+  ggplot(aes(x = global_lofs_30, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Local outlier factor", limits = c(0.93, 1.3)) +
+  ylab("Densité")
+```
+
+## Troisième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA66257A801751")
+pas_routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA76598A803021")
+
+lof_routinier <- tibble(global_lofs_30 = routinier$global_lofs_30, vin = "routinier")
+lof_pas_routinier <- tibble(global_lofs_30 = pas_routinier$global_lofs_30, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(lof_routinier, lof_pas_routinier) %>%
+  ggplot(aes(x = global_lofs_30, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Global local outlier factor", limits = c(0.93, 1.3)) +
+  ylab("Densité")
+```
+
+## Quatrième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_global_lofs_30, vin == "3C6RR7KT4HG626422")
+pas_routinier <- filter(aug_trip_sample_global_lofs_30, vin == "3C4PDCAB9FT719408")
+
+lof_routinier <- tibble(global_lofs_30 = routinier$global_lofs_30, vin = "routinier")
+lof_pas_routinier <- tibble(global_lofs_30 = pas_routinier$global_lofs_30, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(lof_routinier, lof_pas_routinier) %>%
+  ggplot(aes(x = global_lofs_30, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Global local outlier factor", limits = c(0.93, 1.3)) +
+  ylab("Densité")
+```
+
+
+## Cinquième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_global_lofs_30, vin == "3C6RR7KT4HG626422")
+pas_routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA76598A803021")
+
+lof_routinier <- tibble(global_lofs_30 = routinier$global_lofs_30, vin = "routinier")
+lof_pas_routinier <- tibble(global_lofs_30 = pas_routinier$global_lofs_30, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(lof_routinier, lof_pas_routinier) %>%
+  ggplot(aes(x = global_lofs_30, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Global local outlier factor", limits = c(0.93, 1.3)) +
+  ylab("Densité")
+```
+
+## Sixième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA66238A803564")
+pas_routinier <- filter(aug_trip_sample_global_lofs_30, vin == "19UUA76598A803021")
+
+lof_routinier <- tibble(global_lofs_30 = routinier$global_lofs_30, vin = "routinier")
+lof_pas_routinier <- tibble(global_lofs_30 = pas_routinier$global_lofs_30, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(lof_routinier, lof_pas_routinier) %>%
+  ggplot(aes(x = global_lofs_30, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Global local outlier factor", limits = c(0.93, 1.3)) +
+  ylab("Densité")
+```

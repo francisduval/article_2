@@ -1,0 +1,218 @@
+---
+title: "Simulation d'un super-prêtre et d'un super-livreur"
+author: "Francis Duval"
+date: "13/07/2021"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = F,
+	warning = F
+)
+```
+
+```{r Lire les fonctions}
+purrr::walk(fs::dir_ls("R"), source)
+```
+
+```{r Importer les librairies, results = "hide"}
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+library(hms)
+library(dbscan)
+library(plotly)
+library(rlang)
+
+set.seed(2022)
+theme_set(theme_bw())
+```
+
+# Simulation des conducteurs
+
+## Super-pretre
+
+-   time_start: **1000 trajets à 8h** (à 28800 secondes) et **1000 trajets à 17h** (61200 secondes), avec une très petite variabilité.
+-   distance: les **2000 trajets** sont de **5 km**, avec une petite variabilité.
+
+```{r}
+pretre <- 
+  tibble(
+    time_start = as_hms(c(seq(28700, 28900, length.out = 1000), seq(61100, 61300, length.out = 1000))),
+    distance = seq(4.95, 5.05, length.out = 2000)
+  ) %>% 
+  mutate(
+    time_start_norm = (as.numeric(time_start) * 2 * pi) / 86400,
+    cos_time_start = cos(time_start_norm),
+    sin_time_start = sin(time_start_norm)
+  ) %>% 
+  select(
+    -time_start_norm
+  )
+```
+
+```{r}
+ggplot(pretre, aes(x = time_start, y = distance)) +
+  geom_point(size = 0.5, alpha = 0.4) +
+  ylim(c(0, 10))
+```
+
+## Super-livreur
+
+-   time_start: les 2000 trajets sont uniformément distribués entre minuit et 23h59.
+-   distance: les 2000 trajets sont uniformément distribués entre 1 et 10 km.
+
+```{r}
+livreur <- 
+  tibble(
+    time_start = as_hms(sample(seq(1, 86400, length.out = 2000))),
+    distance = sample(seq(1, 10, length.out = 2000))
+  ) %>% 
+  mutate(
+    time_start_norm = (as.numeric(time_start) * 2 * pi) / 86400,
+    cos_time_start = cos(time_start_norm),
+    sin_time_start = sin(time_start_norm)
+  ) %>% 
+  select(
+    -time_start_norm
+  )
+```
+
+```{r}
+ggplot(livreur, aes(x = time_start, y = distance)) +
+  geom_point(size = 0.5) +
+  ylim(c(0, 10))
+```
+
+# LOFs
+
+## Calcul des LOFs
+
+On centre et on réduit les variables (pour l'heure de la journée, j'utilise les variables *cos_time_start* et *sin_time_start*)
+
+```{r}
+rec_pretre <- 
+  recipe(~ ., data = pretre) %>%
+  step_rm(time_start) %>% 
+  step_normalize(all_predictors()) %>% 
+  prep()
+
+rec_livreur <- 
+  recipe(~ ., data = livreur) %>%
+  step_rm(time_start) %>% 
+  step_normalize(all_predictors()) %>% 
+  prep()
+
+
+pretre_baked <- bake(rec_pretre, new_data = pretre) 
+livreur_baked <- bake(rec_livreur, new_data = livreur)
+```
+
+On calcule les LOFs pour chacun des trajets de 2 conducteurs (j'ai choisi k = 10)
+
+```{r}
+lofs_pretre <- lof(pretre_baked, minPts = 10)
+lofs_livreur <- lof(livreur_baked, minPts = 10)
+```
+
+## Densité des LOFs
+
+```{r}
+plot_data <- 
+  tibble(
+    lofs = c(lofs_pretre, lofs_livreur),
+    conducteur = c(rep("Super-pretre", 2000), rep("Super-livreur", 2000))
+  )
+
+ggplot(plot_data, aes(x = lofs, fill = conducteur)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Local outlier factor", limits = c(0.8, 2.4)) +
+  ylab("Densité")
+```
+
+-   Ça donne des distributions dégénérées avec tout le poids en 1 parce que de la manière que j'ai simulé (uniformément), tous les points ont la même densité locale.
+
+-   Les LOFs ne mesurent donc pas exactement le « degré de routine ».
+
+-   Selon moi, les LOFs mesurent à quel point un conducteur fait des trajets en dehors de ses trajets habituels. Et « habituel » est différent d'un conducteur à l'autre. Pour le super-prêtre, « habituel » est 5km à 8h ou à 17h. Pour le super-livreur, « habituel » est entre 1 et 10 km à n'importe quelle heure de la journée.
+
+
+# Mahalanobis
+
+```{r}
+maha_pretre <- mahalanobis(pretre_baked, center = colMeans(pretre_baked), cov = cov(pretre_baked))
+maha_livreur <- mahalanobis(livreur_baked, center = colMeans(livreur_baked), cov = cov(livreur_baked))
+```
+
+```{r}
+plot_data <- 
+  tibble(
+    maha = c(maha_pretre, maha_livreur),
+    conducteur = c(rep("Super-pretre", 2000), rep("Super-livreur", 2000))
+  )
+```
+
+```{r}
+ggplot(plot_data, aes(x = maha, fill = conducteur)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis") +
+  ylab("Densité")
+```
+```{r}
+ggplot(plot_data, aes(x = maha, fill = conducteur)) +
+  geom_histogram(color = "#e9ecef", alpha = 0.4, bins = 100) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis") +
+  ylab("Densité")
+```
+
+
+```{r}
+plot_scatter_3d <- function(data, x, y, z) {
+  x <- enquo(x)
+  y <- enquo(y)
+  z <- enquo(z)
+  
+  quo(
+    {
+      plot_ly(
+        data, 
+        x = ~ !!x, 
+        y = ~ !!y, 
+        z = ~ !!z,
+  
+        marker = list(
+          size = 2,
+          color = "black",
+          opacity = 0.2
+      )
+      ) %>% 
+      add_markers()
+    }
+  ) %>% 
+    quo_squash() %>% 
+    eval_tidy()
+}
+```
+
+```{r}
+plot_scatter_3d(pretre_baked, distance, cos_time_start, sin_time_start)
+```
+
+```{r}
+plot_scatter_3d(livreur_baked, distance, cos_time_start, sin_time_start)
+```
+
+

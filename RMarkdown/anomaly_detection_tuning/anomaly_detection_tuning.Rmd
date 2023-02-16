@@ -1,0 +1,137 @@
+---
+title: "Calibrating anomaly detection techniques"
+author: "Francis Duval"
+date: "07/03/2022"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = F,
+	warning = F
+)
+```
+
+```{r}
+library(conflicted)
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(rsample)
+library(lubridate)
+library(qs)
+library(fastDummies)
+library(here)
+library(dtplyr)
+library(hms)
+library(fs)
+library(embed)
+library(glmnet)
+library(glue)
+library(dbscan)
+library(e1071)
+library(ranger)
+library(solitude)
+library(mixOmics)
+map <- purrr::map
+filter <- dplyr::filter
+select <- dplyr::select
+theme_set(theme_bw())
+```
+
+```{r}
+local_maha_tune <- tar_read(local_maha_tune)
+global_maha_tune <- tar_read(global_maha_tune)
+local_lof_tune <- tar_read(local_lof_tune)
+global_lof_tune <- tar_read(global_lof_tune)
+local_if_tune <- tar_read(local_if_tune)
+global_if_tune <- tar_read(global_if_tune)
+
+local_lof_grid <- tar_read(local_lof_grid)
+global_lof_grid <- tar_read(global_lof_grid)
+local_if_grid <- tar_read(local_if_grid)
+global_if_grid <- tar_read(global_if_grid)
+```
+
+
+```{r}
+local_maha <- local_maha_tune %>% mutate(technique = "local_maha")
+global_maha <- global_maha_tune %>% mutate(technique = "global_maha")
+local_lof <- reduce(local_lof_tune, bind_rows) %>% mutate(k_frac = local_lof_grid, technique = "local_lof")
+global_lof <- reduce(global_lof_tune, bind_rows) %>% mutate(k = global_lof_grid, technique = "gloal_lof")
+local_if <- reduce(local_if_tune, bind_rows) %>% mutate(sample_size_frac = local_if_grid, technique = "local_if")
+global_if <- reduce(global_if_tune, bind_rows) %>% mutate(sample_size = global_if_grid, technique = "global_if")
+```
+
+
+```{r}
+ggplot(local_lof, aes(x = k_frac, y = mean)) +
+  geom_point() +
+  geom_line(linetype = "dashed", alpha = 0.8) +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  xlab("Number of neighbors (fraction of number of trips)") +
+  ylab("AUC") +
+  ggtitle("Local LOF tuning") +
+  labs(subtitle = "5-fold cross-validation results")
+```
+
+```{r}
+ggplot(global_lof, aes(x = k, y = mean)) +
+  geom_point() +
+  geom_line(linetype = "dashed", alpha = 0.8) +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  xlab("Number of neighbors") +
+  ylab("AUC") +
+  ggtitle("Global LOF tuning") +
+  labs(subtitle = "5-fold cross-validation results")
+```
+
+```{r}
+ggplot(local_if, aes(x = sample_size_frac, y = mean)) +
+  geom_point() +
+  geom_line(linetype = "dashed", alpha = 0.8) +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  xlab("Sample size (fraction of number of trips)") +
+  ylab("AUC") +
+  ggtitle("Local isolation forest tuning") +
+  labs(subtitle = "5-fold cross-validation results")
+```
+
+```{r}
+ggplot(global_if, aes(x = sample_size, y = mean)) +
+  geom_point() +
+  geom_line(linetype = "dashed", alpha = 0.8) +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  xlab("Sample size") +
+  ylab("AUC") +
+  ggtitle("Global isolation forest tuning") +
+  labs(subtitle = "5-fold cross-validation results")
+```
+
+```{r}
+filter(local_lof, mean == max(mean)) %>% 
+  bind_rows(local_maha) %>% 
+  bind_rows(global_maha) %>% 
+  bind_rows(filter(global_lof, mean == max(mean))) %>% 
+  bind_rows(filter(local_if, mean == max(mean))) %>% 
+  bind_rows(filter(global_if, mean == max(mean))) %>% 
+  ggplot(aes(x = technique, y = mean)) +
+  geom_point() +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  xlab(NULL) +
+  ylab("AUC")
+```
+
+
+
+

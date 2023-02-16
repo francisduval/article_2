@@ -1,0 +1,380 @@
+---
+title: "Scores de Mahalanobis"
+author: "Francis Duval"
+date: "09/02/2022"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = F,
+	warning = F
+)
+```
+
+```{r, results = "hide"}
+purrr::walk(fs::dir_ls("R"), source)
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(rsample)
+library(lubridate)
+library(qs)
+library(fastDummies)
+library(here)
+library(dtplyr)
+library(hms)
+library(fs)
+library(embed)
+library(glmnet)
+library(glue)
+library(dbscan)
+library(e1071)
+library(ranger)
+theme_set(theme_bw())
+```
+
+
+```{r}
+ml_data_local_maha <- tar_read(ml_data_local_maha)
+ml_data_response <- tar_read(ml_data_response)
+ml_data_class <- tar_read(ml_data_class)
+ml_data_dist <- tar_read(ml_data_dist)
+```
+
+```{r}
+ml_data <- 
+  ml_data_local_maha %>% 
+  left_join(ml_data_class, by = "vin") %>% 
+  left_join(ml_data_dist, by = "vin") %>% 
+  left_join(ml_data_response, by = "vin")
+```
+
+
+# Mahalanobis local-- Réclamants versus non-réclamants
+
+## Distributions des statistiques reliées aux scores de Mahalanobis locaux {.tabset .tabset-pills}
+
+On va regarder si la distribution des statistiques calculées est différente pour les réclamants et les non-réclamants.
+
+```{r}
+plot_density <- function(data, var) {
+  xlim <- quantile(data[[quo_name(enquo(var))]], probs = c(0.01, 0.99), na.rm = T)
+  
+  data %>% 
+    ggplot(aes(x = {{var}}, fill = claim_ind_cov_1_2_3_4_5_6)) +
+    geom_density(color = "#e9ecef", alpha = 0.4) +
+    scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+    ylab("Densité") +
+    xlab(NULL) +
+    xlim(xlim)
+}
+```
+
+### Mean {-}
+```{r}
+plot_density(ml_data, var = local_maha_mean)
+```
+
+### Variance {-}
+```{r}
+plot_density(ml_data, var = local_maha_var)
+```
+
+### Skewness {-}
+```{r}
+plot_density(ml_data, var = local_maha_skewness)
+```
+
+### Kurtosis {-}
+```{r}
+plot_density(ml_data, var = local_maha_kurtosis)
+```
+
+### Quantile 0.01 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q01)
+```
+
+### Quantile 0.05 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q05)
+```
+
+### Quantile 0.25 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q25)
+```
+
+### Quantile 0.50 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q50)
+```
+
+### Quantile 0.75 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q75)
+```
+
+### Quantile 0.95 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q95)
+```
+
+### Quantile 0.99 {-}
+```{r}
+plot_density(ml_data, var = local_maha_q99)
+```
+
+### Âge du véhicule (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = veh_age)
+```
+
+### Nombre d'années depuis la dernière réclamation (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = years_claim_free)
+```
+
+### Distance annuelle déclarée (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = annual_distance)
+```
+
+### Distance annuelle réelle (pour fins de comparaison) {-}
+```{r}
+plot_density(ml_data, var = distance)
+```
+
+# Routnier vs pas routinier {.tabset .tabset-pills}
+
+Ici, je pige plusieurs paires de routinier/non-routinier parmi les conducteurs de l'échantillon. La sélection des paires est faite en regardant l'histogramme de l'heure de départ des trajets.
+
+```{r}
+aug_trip_sample <- tar_read(aug_trip_sample)
+local_maha <- tar_read(local_maha)
+```
+
+```{r}
+aug_trip_sample_local_maha <- bind_cols(aug_trip_sample, local_maha = local_maha)
+```
+
+
+```{r}
+plot_hist_time <- function(data, sub = NULL) {
+  ggplot(data, aes(x = time_start)) +
+    geom_histogram(binwidth = 900, col = "black", fill = "white") +
+    xlab("Heure") +
+    ylab("Nombre de trajets") +
+    labs(subtitle = sub)
+}
+```
+
+## Première paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_local_maha, vin == "1C4PJMCS2GW172098")
+pas_routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA56642A801987")
+
+local_maha_routinier <- tibble(local_maha = routinier$local_maha, vin = "routinier")
+local_maha_pas_routinier <- tibble(local_maha = pas_routinier$local_maha, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(local_maha_routinier, local_maha_pas_routinier) %>%
+  ggplot(aes(x = local_maha, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis local", limits = c(0, 28)) +
+  ylab("Densité")
+```
+
+## Deuxième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA66238A803564")
+pas_routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA66246A800508")
+
+local_maha_routinier <- tibble(local_maha = routinier$local_maha, vin = "routinier")
+local_maha_pas_routinier <- tibble(local_maha = pas_routinier$local_maha, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(local_maha_routinier, local_maha_pas_routinier) %>%
+  ggplot(aes(x = local_maha, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis local", limits = c(0, 25)) +
+  ylab("Densité")
+```
+
+## Troisième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA66257A801751")
+pas_routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA76598A803021")
+
+local_maha_routinier <- tibble(local_maha = routinier$local_maha, vin = "routinier")
+local_maha_pas_routinier <- tibble(local_maha = pas_routinier$local_maha, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(local_maha_routinier, local_maha_pas_routinier) %>%
+  ggplot(aes(x = local_maha, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis local", limits = c(0, 25)) +
+  ylab("Densité")
+```
+
+## Quatrième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_local_maha, vin == "3C6RR7KT4HG626422")
+pas_routinier <- filter(aug_trip_sample_local_maha, vin == "3C4PDCAB9FT719408")
+
+local_maha_routinier <- tibble(local_maha = routinier$local_maha, vin = "routinier")
+local_maha_pas_routinier <- tibble(local_maha = pas_routinier$local_maha, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(local_maha_routinier, local_maha_pas_routinier) %>%
+  ggplot(aes(x = local_maha, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis local", limits = c(0, 25)) +
+  ylab("Densité")
+```
+
+
+## Cinquième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_local_maha, vin == "3C6RR7KT4HG626422")
+pas_routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA76598A803021")
+
+local_maha_routinier <- tibble(local_maha = routinier$local_maha, vin = "routinier")
+local_maha_pas_routinier <- tibble(local_maha = pas_routinier$local_maha, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(local_maha_routinier, local_maha_pas_routinier) %>%
+  ggplot(aes(x = local_maha, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis local", limits = c(0, 25)) +
+  ylab("Densité")
+```
+
+## Sixième paire {.tabset .tabset-pills}
+
+```{r}
+routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA66238A803564")
+pas_routinier <- filter(aug_trip_sample_local_maha, vin == "19UUA76598A803021")
+
+local_maha_routinier <- tibble(local_maha = routinier$local_maha, vin = "routinier")
+local_maha_pas_routinier <- tibble(local_maha = pas_routinier$local_maha, vin = "pas routinier")
+```
+
+### Histogramme routinier {-}
+
+```{r}
+plot_hist_time(routinier, sub = "routinier")
+```
+
+### Histogramme pas routinier {-}
+
+```{r}
+plot_hist_time(pas_routinier, sub = "pas routinier")
+```
+
+### Comparaison des densités {-}
+
+```{r}
+bind_rows(local_maha_routinier, local_maha_pas_routinier) %>%
+  ggplot(aes(x = local_maha, fill = vin)) +
+  geom_density(color = "#e9ecef", alpha = 0.4) +
+  scale_fill_manual(name = NULL, values = c("#69b3a2", "#404080")) +
+  scale_x_continuous(name = "Score de Mahalanobis local", limits = c(0, 25)) +
+  ylab("Densité")
+```

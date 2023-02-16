@@ -1,0 +1,170 @@
+---
+title: "Local outlier factors"
+author: "Francis Duval"
+date: "13/07/2021"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+# Obtention de statistiques reliées aux local outlier factors
+
+J'ai d'abord calculé les *local outlier factors* (LOFs) pour chacun des trajets de chacun des conducteurs. On obtient donc, pour chaque conducteur, une distribution empirique des LOFs. Les LOFs sont obtenus en « silo » pour chaque conducteur. Pour calculer la distribution des LOFs pour le conducteur A, on a donc seulement besoin des données du conducteur A.
+
+Les variables utilisées pour le calcul des LOFs sont:
+
+* duration
+* distance
+* avg_speed
+* max_speed
+* cos_time_start
+* sin_time_start
+* cos_nb_days_since_monday
+* sin_nb_days_since_monday.
+
+Dans l'algorithme LOF, il y a un hyperparamètre *k* que l'on doit choisir, et qui correspond au nombre de plus proches voisins à utiliser pour le calcul de la densité locale. J'en ai essayé plusieurs, c'est-à-dire:
+
+* k = 5
+* k = 10
+* k = 20
+* k = 30
+* k = 50
+* k = 100.
+
+Ensuite, on calcule des statistiques tirées de la distribution empirique des LOFs pour chaque conducteur et pour chaque valeur de *k*. Les statistiques calculées sont:
+
+* mean
+* variance
+* skewness
+* kurtosis
+* Quantiles (1%, 5%, 25%, 50%, 75%, 95% et 99%).
+
+On se retrouve donc à créer 11 nouvelles variables pour chaque conducteur. Puisqu'on a calculé les LOFs pour 6 valeurs de *k*, ça fait donc 11 fois 6 = 66 nouvelles variables.
+
+# Impact des 66 nouvelles variables sur la fréquence de réclamation {.tabset .tabset-pills}
+
+## Mean {-}
+
+<img src = "mean.png" width = "1200">
+
+## Variance {-}
+
+<img src = "var.png" width = "1200">
+
+## Skewness {-}
+
+<img src = "skewness.png" width = "1200">
+
+## Kurtosis {-}
+
+<img src = "kurtosis.png" width = "1200">
+
+## Quantile 1% {-}
+
+<img src = "q01.png" width = "1200">
+
+## Quantile 5% {-}
+
+<img src = "q05.png" width = "1200">
+
+## Quantile 25% {-}
+
+<img src = "q25.png" width = "1200">
+
+## Quantile 50% {-}
+
+<img src = "q50.png" width = "1200">
+
+## Quantile 75% {-}
+
+<img src = "q75.png" width = "1200">
+
+## Quantile 95% {-}
+
+<img src = "q95.png" width = "1200">
+
+## Quantile 99% {-}
+
+<img src = "q99.png" width = "1200">
+
+# Distributions des 66 nouvelles variables pour contrats avec versus sans réclamation {.tabset .tabset-pills}
+
+## Mean {-}
+
+<img src = "mean_2.png" width = "1200">
+
+## Variance {-}
+
+<img src = "var_2.png" width = "1200">
+
+## Skewness {-}
+
+<img src = "skewness_2.png" width = "1200">
+
+## Kurtosis {-}
+
+<img src = "kurtosis_2.png" width = "1200">
+
+## Quantile 1% {-}
+
+<img src = "q01_2.png" width = "1200">
+
+## Quantile 5% {-}
+
+<img src = "q05_2.png" width = "1200">
+
+## Quantile 25% {-}
+
+<img src = "q25_2.png" width = "1200">
+
+## Quantile 50% {-}
+
+<img src = "q50_2.png" width = "1200">
+
+## Quantile 75% {-}
+
+<img src = "q75_2.png" width = "1200">
+
+## Quantile 95% {-}
+
+<img src = "q95_2.png" width = "1200">
+
+## Quantile 99% {-}
+
+<img src = "q99_2.png" width = "1200">
+
+
+# Régression logistique lasso avec les 66 nouvelles variables
+
+J'ai utilisé les 66 variables dans une régression logistique lasso pour prédire l'indicatrice d'une réclamation ou plus dans le contrat.
+
+J'ai d'abord calibré et entrainé le modèle sur un ensemble d'entrainement pour ensuite le scorer sur un ensemble test. On obtient un AUC d'environ 0.55. 
+
+<img src = "test_roc_curve.png" width = "1200">
+
+Voici les variables considérées les plus importantes par le modèle:
+
+<img src = "lasso_coefs.png" width = "1200">
+
+On note que le modèle a mis à zéro 49 coefficients, non visibles sur le graphique.
+
+# Notes
+
+* Les variables tirées des LOFs n'ont pas un pouvoir prédictif incroyable (AUC de 0.55), mais c'est quand même mieux que du « random guessing ».
+* On pourrait peut-être donner en entrée les quantiles à un réseau de neurones (disons q01, q02, ..., q99) afin qu'il crée lui-même les statistiques optimales.
+* Réseau de neurones à plusieurs « têtes »: une tête avec les quantiles des LOFs par conducteur, une autre avec les LOFs « globaux » et une autre avec les caractéristiques ordinaires (genre, région, etc.).
+* Il faudrait regarder si l'ajout des 66 variables améliore significativement la performance d'un lasso avec variables classiques.
+* Refaire la même analyse avec les LOFs globaux.

@@ -1,0 +1,377 @@
+---
+title: "Résultats des modèles d'apprentissage supervisé"
+author: "Francis Duval"
+date: "25/01/2022"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = F,
+	warning = F
+)
+
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+
+theme_set(theme_bw())
+```
+
+# Fonction pour les graphiques
+
+```{r}
+make_plot <- function(metric, boot_res_opt_df, boot_res_sum_opt_df) {
+  lev <-
+  c(
+    "class",
+    "class_dist",
+    "class_dist_global_maha",
+    "class_dist_local_maha",
+    "class_dist_local_10_lof",
+    "class_dist_global_10_lof",
+    "class_dist_global_20_lof",
+    "class_dist_global_30_lof",
+    "class_dist_global_40_lof",
+    "class_dist_local_if",
+    "class_dist_global_if"
+  )
+  
+  df1 <- filter(boot_res_opt_df, .metric == metric)
+  df2 <- filter(boot_res_sum_opt_df, .metric == metric)
+
+  ggplot(df1, aes(x = covariates, y = .estimate, color = covariates, fill = covariates)) +
+    ggdist::stat_halfeye(
+      adjust = .33,
+      width = .67, 
+      color = NA,
+      position = position_nudge(x = .1)
+    ) +
+    geom_point(aes(x = covariates, y = mean), data = df2) +
+    geom_point(
+      position = position_nudge(x = -.22),
+      shape = 95, size = 4, alpha = 0.7
+    ) +
+    ylab(metric) +
+    xlab(NULL) +
+    guides(fill = "none", color = "none") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+}
+```
+
+# Importer les résultats
+
+```{r}
+glmnet_tuning_ls <- tar_read(glmnet_tuning_ls)
+rf_tuning_ls <- tar_read(rf_tuning_ls)
+xgb_tuning_ls <- tar_read(xgb_tuning_ls)
+```
+
+```{r}
+names(glmnet_tuning_ls) <- names(tar_read(ml_df_ls))
+names(rf_tuning_ls) <- names(xgb_tuning_ls) <- names(tar_read(ml_df_ls))[1:9]
+```
+
+```{r}
+collect_optimal_metrics <- function(tuning, metric, summarize = T) {
+  best_params <- select_best(tuning, metric = metric)
+  tuning %>% 
+    filter_parameters(parameters = best_params) %>% 
+    collect_metrics(summarize = summarize)
+}
+```
+
+```{r}
+make_tuning_res_df <- function(tuning_ls, metric, summarize = T) {
+  map(tuning_ls, collect_optimal_metrics, metric = metric, summarize = summarize) %>% 
+    imap_dfr(~ mutate(.x, covariates = .y))
+}
+```
+
+```{r}
+glmnet_res_sum <- make_tuning_res_df(glmnet_tuning_ls, metric = "roc_auc", summarize = T)
+rf_res_sum <- make_tuning_res_df(rf_tuning_ls, metric = "roc_auc", summarize = T)
+xgb_res_sum <- make_tuning_res_df(xgb_tuning_ls, metric = "roc_auc", summarize = T)
+
+glmnet_res <- make_tuning_res_df(glmnet_tuning_ls, metric = "roc_auc", summarize = F)
+rf_res <- make_tuning_res_df(rf_tuning_ls, metric = "roc_auc", summarize = F)
+xgb_res <- make_tuning_res_df(xgb_tuning_ls, metric = "roc_auc", summarize = F)
+```
+
+# Graphiques de la performance des ensembles de prédicteurs
+
+On a une base de données équilibrée (50% réclamants et 50% non-réclamants) de 4834 contrats d'un an (dont 30% est mis de côté pour l'ensemble test). Pour chaque contrat on a les variables classiques et la distance parcourue. J'ai calculé les LOFs globaux avec k = 10, k = 20, k = 30 et k = 40, ainsi que les LOFs locaux (k spécifique à chaque VIN déterminé avec l'algorithme de tuning, et k fixé à 10 pour tous) et le score de Mahalanobis. J'ai ensuite calculé des statistiques avec ces LOFs et score de Mahalanobis (moyenne, variance, skewness, etc.). On veut comparer la performance d'un elastic-net et d'un XGBoost avec et sans ces statistiques reliées aux LOFs (et score de Mahalanobis). On prend comme métriques l'AUC, l'accuracy, la sensibilité (capacité à bien détecter les réclamants) et la spécificité (capacité à bien détecter les non-réclamants).
+
+-   **class**: variables classiques seulement
+-   **class_dist**: variables classiques + distance parcourue
+-   **class_dist_global_maha**: variables classiques + distance parcourue + score de Mahalanobis global
+-   **class_dist_local_maha**: variables classiques + distance parcourue + score de Mahalanobis local
+-   **class_dist_local_lof**: variables classiques + distance parcourue + LOFs locaux calibré individuellement
+-   **class_dist_local_10_lof**: variables classiques + distance parcourue + LOFs locaux avec k = 10 pour tous
+-   **class_dist_global_10_lof**: variables classiques + distance parcourue + LOFs globaux avec k = 10
+-   **class_dist_global_20_lof**: variables classiques + distance parcourue + LOFs globaux avec k = 20
+-   **class_dist_global_30_lof**: variables classiques + distance parcourue + LOFs globaux avec k = 30
+-   **class_dist_global_40_lof**: variables classiques + distance parcourue + LOFs globaux avec k = 40
+
+Les graphiques suivants montrent la distribution des 4 métriques pour 50 échantillons bootstrap (le bootstrap a été utilisé à la place de la validation croisée pour avoir une meilleure idée de la distribution). Les points correspondent à la métrique moyenne.
+
+## Modèles elastic-net
+
+### Performance avec 50 échantillons bootstrap {.tabset .tabset-pills}
+
+#### AUC {.unnumbered}
+
+```{r}
+make_plot("roc_auc", glmnet_res, glmnet_res_sum)
+```
+
+#### Accuracy {.unnumbered}
+
+```{r}
+make_plot("accuracy", glmnet_res, glmnet_res_sum)
+```
+
+#### Sensibilité {.unnumbered}
+
+```{r}
+make_plot("sens", glmnet_res, glmnet_res_sum)
+```
+
+#### Spécificité {.unnumbered}
+
+```{r}
+make_plot("spec", glmnet_res, glmnet_res_sum)
+```
+
+### Amélioration par rapport au modèle classique
+
+```{r}
+glmnet_res_sum %>% 
+  group_split(.metric) %>% 
+  map(~ mutate(., amelioration = mean - first(mean))) %>% 
+  reduce(bind_rows) %>% 
+  ggplot(aes(y = amelioration, x = covariates, fill = .metric)) +
+  geom_col(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(fill = NULL, subtitle = "Amélioration par rapport au modèle classique")
+```
+
+### Amélioration par rapport au modèle classique + distance
+
+```{r}
+glmnet_res_sum %>% 
+  filter(str_detect(covariates, "local|^class$|^class_dist$")) %>% 
+  group_split(.metric) %>% 
+  map(~ mutate(., amelioration = mean - nth(mean, 2))) %>% 
+  reduce(bind_rows) %>% 
+  ggplot(aes(y = amelioration, x = covariates, fill = .metric)) +
+  geom_col(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(fill = NULL, subtitle = "Amélioration par rapport au modèle classique + distance")
+```
+
+```{r}
+glmnet_res_sum %>% 
+  filter(str_detect(covariates, "global|^class$|^class_dist$")) %>% 
+  group_split(.metric) %>% 
+  map(~ mutate(., amelioration = mean - nth(mean, 2))) %>% 
+  reduce(bind_rows) %>% 
+  ggplot(aes(y = amelioration, x = covariates, fill = .metric)) +
+  geom_col(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(fill = NULL, subtitle = "Amélioration par rapport au modèle classique + distance")
+```
+
+
+### Analyse de l'importance des variables {.tabset .tabset-pills}
+
+```{r}
+glmnet_last_fit_ls <- tar_read(glmnet_last_fit_ls)
+```
+
+```{r}
+plot_enet_coefs <- function(last_fit, title = NULL, subtitle = NULL) {
+  last_fit %>% 
+    extract_fit_parsnip() %>%
+    tidy() %>% 
+    filter(term != "(Intercept)") %>% 
+    mutate(Sign = if_else(estimate > 0, "+", "-")) %>% 
+    mutate(abs_estimate = abs(estimate)) %>% 
+    mutate(term = fct_reorder(term, abs_estimate)) %>% 
+    ggplot(aes(x = term, y = abs_estimate, fill = Sign)) +
+    geom_col(alpha = 0.7) +
+    xlab(NULL) +
+    ylab("Absolute value of coefficient") +
+    scale_fill_manual(values = c("#a61d21", "#00743F")) +
+    coord_flip() +
+    labs(subtitle = subtitle) +
+    ggtitle(title)
+}
+```
+
+#### class {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[1]])
+```
+
+#### class + dist {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[2]])
+```
+
+#### class + dist + maha global  {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[3]])
+```
+
+#### class + dist + maha local  {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[4]])
+```
+
+#### class + dist + local_lof {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[5]])
+```
+
+#### class + dist + local_10_lof {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[6]])
+```
+
+#### class + dist + global_10_lof {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[7]])
+```
+
+#### class + dist + global_20_lof {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[8]])
+```
+
+#### class + dist + global_30_lof {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[9]])
+```
+
+#### class + dist + global_40_lof {.unnumbered}
+```{r}
+plot_enet_coefs(glmnet_last_fit_ls[[10]])
+```
+
+
+## Modèles random forest
+
+### Performance avec 25 échantillons bootstrap {.tabset .tabset-pills}
+
+#### AUC {.unnumbered}
+
+```{r}
+make_plot("roc_auc", rf_res, rf_res_sum)
+```
+
+#### Accuracy {.unnumbered}
+
+```{r}
+make_plot("accuracy", rf_res, rf_res_sum)
+```
+
+#### Sensibilité {.unnumbered}
+
+```{r}
+make_plot("sens", rf_res, rf_res_sum)
+```
+
+#### Spécificité {.unnumbered}
+
+```{r}
+make_plot("spec", rf_res, rf_res_sum)
+```
+
+### Amélioration par rapport au modèle classique
+
+```{r}
+rf_res_sum %>% 
+  group_split(.metric) %>% 
+  map(~ mutate(., amelioration = mean - first(mean))) %>% 
+  reduce(bind_rows) %>% 
+  ggplot(aes(y = amelioration, x = covariates, fill = .metric)) +
+  geom_col(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(fill = NULL, subtitle = "Amélioration par rapport au modèle classique")
+```
+
+### Amélioration par rapport au modèle classique + distance
+
+```{r}
+rf_res_sum %>% 
+  group_split(.metric) %>% 
+  map(~ mutate(., amelioration = mean - nth(mean, 2))) %>% 
+  reduce(bind_rows) %>% 
+  ggplot(aes(y = amelioration, x = covariates, fill = .metric)) +
+  geom_col(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(fill = NULL, subtitle = "Amélioration par rapport au modèle classique + distance")
+```
+
+## Modèles XGBoost
+
+### Performance avec 25 échantillons bootstrap {.tabset .tabset-pills}
+
+#### AUC {.unnumbered}
+
+```{r}
+make_plot("roc_auc", xgb_res, xgb_res_sum)
+```
+
+#### Accuracy {.unnumbered}
+
+```{r}
+make_plot("accuracy", xgb_res, xgb_res_sum)
+```
+
+#### Sensibilité {.unnumbered}
+
+```{r}
+make_plot("sens", xgb_res, xgb_res_sum)
+```
+
+#### Spécificité {.unnumbered}
+
+```{r}
+make_plot("spec", xgb_res, xgb_res_sum)
+```
+
+### Amélioration par rapport au modèle classique
+
+```{r}
+xgb_res_sum %>% 
+  group_split(.metric) %>% 
+  map(~ mutate(., amelioration = mean - first(mean))) %>% 
+  reduce(bind_rows) %>% 
+  ggplot(aes(y = amelioration, x = covariates, fill = .metric)) +
+  geom_col(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(fill = NULL, subtitle = "Amélioration par rapport au modèle classique")
+```

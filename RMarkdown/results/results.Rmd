@@ -1,0 +1,468 @@
+---
+title: "Résultats"
+author: "Francis Duval"
+date: "11/03/2022"
+output:
+    rmdformats::readthedown:
+      toc_depth: 2
+      number_sections: yes
+      collapsed: false
+      code_folding: show
+      highlight: kate
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(
+	eval = T,
+	echo = T,
+	message = F,
+	warning = F
+)
+```
+
+```{r, include = F}
+library(conflicted)
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(rsample)
+library(lubridate)
+library(qs)
+library(fastDummies)
+library(here)
+library(dtplyr)
+library(hms)
+library(fs)
+library(embed)
+library(glmnet)
+library(glue)
+library(dbscan)
+library(e1071)
+library(ranger)
+library(solitude)
+map <- purrr::map
+filter <- dplyr::filter
+select <- dplyr::select
+theme_set(theme_bw())
+```
+
+```{r, include = F}
+models_1 <- 
+  c(
+    "class_dist",
+    "local_maha_class_dist",
+    "global_maha_class_dist",
+    "local_lof_class_dist",
+    "global_lof_class_dist",
+    "local_if_class_dist",
+    "global_if_class_dist"
+  )
+
+models_2 <- 
+  c(
+    "local_maha",
+    "global_maha",
+    "local_lof",
+    "global_lof",
+    "local_if",
+    "global_if"
+  )
+```
+
+
+# Calibration des méthodes de détection d'anomalies
+
+Les méthodes LOF et isolation forest ont chacune un paramètre à calibrer. Pour le LOF, c'est k, le nombre d'observations à utiliser comme plus proches voisins. Pour isolation forest, c'est le nombre d'observations à piger à chaque fois qu'on construit un arbre. Pour les méthodes locales, le paramètre est exprimé en % du nombre de trajets du véhicule. Pour les méthodes globales, c'est exprimé en nombre absolu.
+
+J'utilise l'AUC de 5-validation croisée pour déterminer le meilleur paramètre. Le modèle est une régression logistique non-pénalisée. Les variables qu'on a sont les 101 centiles (99 centiles + le max et le min) des scores d'anomalies. On exclut les variables classiques et la distance pour calibrer. Je résume d'abord les 101 variables avec une ACP. Je garde un nombre de CP qui permet d'expliquer 95% de la variance.
+
+```{r, include = F}
+local_maha_tune <- tar_read(local_maha_tune)
+global_maha_tune <- tar_read(global_maha_tune)
+local_lof_tune <- tar_read(local_lof_tune)
+global_lof_tune <- tar_read(global_lof_tune)
+local_if_tune <- tar_read(local_if_tune)
+global_if_tune <- tar_read(global_if_tune)
+
+local_lof_grid <- tar_read(local_lof_grid)
+global_lof_grid <- tar_read(global_lof_grid)
+local_if_grid <- tar_read(local_if_grid)
+global_if_grid <- tar_read(global_if_grid)
+```
+
+```{r, include = F}
+plot_tuning <- function(tuning_ls, param_vec) {
+  tuning_ls %>% 
+    reduce(bind_rows) %>% 
+    mutate(param = param_vec) %>% 
+    ggplot(aes(x = param, y = mean)) +
+    geom_point() +
+    geom_line(linetype = "dashed", alpha = 0.8) +
+    geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+    ylab("AUC") +
+    labs(subtitle = "5-fold cross-validation")
+}
+```
+
+Une fois la calibration faite, les paramètres optimaux sont utilisés dans le reste de l'analyse pour calculer les scores d'anomalie. Les voici:
+
+* Mahalanobis local: pas de paramètre à calibrer
+* Mahalanobis global: pas de paramètre à calibrer
+* LOF local: `r local_lof_grid[which.max(map(local_lof_tune, "mean"))]`
+* LOF global: `r global_lof_grid[which.max(map(global_lof_tune, "mean"))]`
+* Isolation forest local: `r local_if_grid[which.max(map(local_if_tune, "mean"))]`
+* Isolation forest: `r global_if_grid[which.max(map(global_if_tune, "mean"))]`
+
+## Graphiques de la calibration {.tabset .tabset-pills}
+
+### Mahalanobis local {-}
+
+Pas de paramètre à calibrer
+
+### Mahalanobis global {-}
+
+Pas de paramètre à calibrer
+
+### LOF local {-}
+
+```{r}
+plot_tuning(local_lof_tune, param_vec = local_lof_grid) +
+  xlab("Fraction of trips per driver used as neighbors")
+```
+
+### LOF global {-}
+
+```{r}
+plot_tuning(global_lof_tune, param_vec = global_lof_grid) +
+  xlab("Number of trips used as neighbors")
+```
+
+### Isolation forest local {-}
+
+```{r}
+plot_tuning(local_if_tune, param_vec = local_if_grid) +
+  xlab("Fraction of trips per driver to use to build a tree in the forest")
+```
+
+### Isolation forest global {-}
+
+```{r}
+plot_tuning(global_if_tune, param_vec = global_if_grid) +
+  xlab("Number of trips to use to build a tree in the forest")
+```
+
+## Résultats de validation croisée pour paramètres optimaux
+
+AUC de validation croisée de la régression logistique non pénalisée utilisant seulement les centiles des scores d'anomalie (pas de variables classiques, pas de distance).
+
+```{r, include = F}
+bind_rows(
+  local_maha_tune,
+  global_maha_tune,
+  local_lof_tune[[which.max(map(local_lof_tune, "mean"))]],
+  global_lof_tune[[which.max(map(global_lof_tune, "mean"))]],
+  local_if_tune[[which.max(map(local_if_tune, "mean"))]],
+  global_if_tune[[which.max(map(global_if_tune, "mean"))]]
+) %>% 
+  mutate(model = factor(models_2, levels = models_2)) %>% 
+  ggplot(aes(x = model, y = mean, col = model)) +
+  geom_point() +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  ylab("AUC") +
+  xlab(NULL) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(subtitle = "5-fold cross-validation, régression logistique non pénalisée")
+```
+
+
+# Calibration des régressions logistiques elastic-net
+
+Le but est d'entrainer une régression logistique elastic-net pour chacune des 6 méthodes de détection d'anomalies. Les modèles auront également en entrée les variables classiques et la distance parcourue. On fait aussi un modèle sans détection d'anomalies, qui fait office de benchmark. Ce modèle benchmark n'utilise que les variables classiques et la distance parcourue. Il faut d'abord trouver les hyperparamètres optimaux à utiliser (alpha et lambda) pour chacun des 7 modèles:
+
+* elastic-net classique + distance (benchmark)
+* elastic-net classique + distance + mahalanobis local
+* elastic-net classique + distance + mahalanobis global
+* elastic-net classique + distance + LOF local
+* elastic-net classique + distance + LOF global
+* elastic-net classique + distance + Isolation forest local
+* elastic-net classique + distance + Isolation forest global
+
+Encore une fois, l'AUC de 5-validation croisée est utilisée pour déterminer les meilleurs hyperparamètres.
+
+```{r}
+tune_en_class_dist <- tar_read(tune_en_class_dist)
+tune_en_local_maha <- tar_read(tune_en_local_maha)
+tune_en_global_maha <- tar_read(tune_en_global_maha)
+tune_en_local_lof <- tar_read(tune_en_local_lof)
+tune_en_global_lof <- tar_read(tune_en_global_lof)
+tune_en_local_if <- tar_read(tune_en_local_if)
+tune_en_global_if <- tar_read(tune_en_global_if)
+```
+
+## Graphiques de la calibration {.tabset .tabset-pills}
+
+### classique + distance (benchmark) {-}
+
+```{r}
+autoplot(tune_en_class_dist, metric = "roc_auc")
+```
+
+### classique + distance + mahalanobis local {-}
+
+```{r}
+autoplot(tune_en_local_maha, metric = "roc_auc")
+```
+
+### classique + distance + mahalanobis global {-}
+
+```{r}
+autoplot(tune_en_global_maha, metric = "roc_auc")
+```
+
+### classique + distance + LOF local {-}
+
+```{r}
+autoplot(tune_en_local_lof, metric = "roc_auc")
+```
+
+### classique + distance + LOF global {-}
+
+```{r}
+autoplot(tune_en_global_lof, metric = "roc_auc")
+```
+
+### classique + distance + Isolation forest local {-}
+
+```{r}
+autoplot(tune_en_local_if, metric = "roc_auc")
+```
+
+### classique + distance + Isolation forest global {-}
+
+```{r}
+autoplot(tune_en_global_if, metric = "roc_auc")
+```
+
+## Meilleurs hyperparamètres pour chaque modèle
+
+Et l'AUC de validation croisée associée.
+
+```{r, include = F}
+tune_list <- 
+  list(
+    tune_en_class_dist,
+    tune_en_local_maha,
+    tune_en_global_maha,
+    tune_en_local_lof,
+    tune_en_global_lof,
+    tune_en_local_if,
+    tune_en_global_if
+  )
+
+show_best_ls <- map(tune_list, ~show_best(., n = 1, metric = "roc_auc"))
+mixture_vec <- map_dbl(show_best_ls, "mixture")
+penalty_vec <- map_dbl(show_best_ls, "penalty")
+roc_auc_vector <- map_dbl(show_best_ls, "mean")
+roc_auc_sd_vector <- map_dbl(show_best_ls, "std_err")
+
+models <- c("class_dist", "local_maha", "global_maha", "local_lof", "global_lof", "local_if", "global_if")
+
+best_params <- 
+  tibble(
+    model = models,
+    mixture = mixture_vec,
+    penalty = penalty_vec,
+    roc_auc = roc_auc_vector,
+    roc_auc_sd = roc_auc_sd_vector
+  )
+```
+
+
+```{r}
+knitr::kable(best_params)
+```
+
+
+## Résultats de validation croisée pour hyperparamètres optimaux
+
+```{r, include = F}
+plot_data <- 
+  map2_df(
+    tune_list,
+    models,
+    ~ collect_metrics(.x) %>% 
+      filter(
+        penalty == best_params$penalty[which(best_params$model == .y)],
+        mixture == best_params$mixture[which(best_params$model == .y)]
+      ) %>% 
+      mutate(model = .y)
+  )
+```
+
+
+```{r}
+plot_data %>% 
+  filter(!(.metric %in% c("sens", "spec", "mn_log_loss"))) %>% 
+  ggplot(aes(x = model, y = mean, col = model)) +
+  facet_grid(vars(.metric), scales = "free") +
+  geom_point() +
+  geom_pointrange(aes(ymin = mean - std_err, ymax = mean + std_err)) +
+  ylab(NULL) +
+  xlab(NULL)
+```
+
+
+# Entrainer les modèles optimaux sur l'ensemble d'entrainement
+
+Ici, on entraine un modèle elastic-net pour chacune des 6 méthodes de détection d'anomalies et pour le modèle benchmark (classiques + distance) sur l'ensemble d'entrainement. Les hyperparamètres optimaux trouvés aux sections précédentes sont utilisés. Aussi, les scores d'anomalies sont décomposés en 101 centiles pour ensuite être résumés avec une ACP. On garde autant de composantes principales nécessaires pour expliquer 99% de l'inertie.
+
+```{r}
+fit_class_dist <- tar_read(fit_class_dist)
+fit_local_maha_class_dist <- tar_read(fit_local_maha_class_dist)
+fit_global_maha_class_dist <- tar_read(fit_global_maha_class_dist)
+fit_local_lof_class_dist <- tar_read(fit_local_lof_class_dist)
+fit_global_lof_class_dist <- tar_read(fit_global_lof_class_dist)
+fit_local_if_class_dist <- tar_read(fit_local_if_class_dist)
+fit_global_if_class_dist <- tar_read(fit_global_if_class_dist)
+```
+
+## Graphiques des coefficients {.tabset .tabset-pills}
+
+```{r, include = F}
+
+plot_enet_coefs <- function(fitted_wf, title = NULL, subtitle = NULL, caption = NULL) {
+  fitted_wf %>% 
+    extract_fit_parsnip() %>% 
+    tidy() %>% 
+    filter(term != "(Intercept)", estimate != 0) %>% 
+    mutate(Sign = if_else(estimate > 0, "+", "-")) %>% 
+    mutate(abs_estimate = abs(estimate)) %>% 
+    mutate(term = fct_reorder(term, abs_estimate)) %>% 
+    ggplot(aes(x = term, y = abs_estimate, fill = Sign)) +
+    geom_col(alpha = 0.8, col = "white") +
+    xlab(NULL) +
+    ylab("Absolute value of coefficient") +
+    scale_fill_manual(values = c("#00adee", "#0855a0")) +
+    coord_flip() +
+    labs(subtitle = subtitle, caption = caption) +
+    ggtitle(title)
+}
+```
+
+### classique + distance (benchmark) {-}
+
+```{r}
+plot_enet_coefs(fit_class_dist)
+```
+
+### classique + distance + mahalanobis local {-}
+
+```{r}
+plot_enet_coefs(fit_local_maha_class_dist)
+```
+
+### classique + distance + mahalanobis global {-}
+
+```{r}
+plot_enet_coefs(fit_global_maha_class_dist)
+```
+
+### classique + distance + LOF local {-}
+
+```{r}
+plot_enet_coefs(fit_local_lof_class_dist)
+```
+
+### classique + distance + LOF global {-}
+
+```{r}
+plot_enet_coefs(fit_global_lof_class_dist)
+```
+
+### classique + distance + Isolation forest local {-}
+
+```{r}
+plot_enet_coefs(fit_local_if_class_dist)
+```
+
+### classique + distance + Isolation forest global {-}
+
+```{r}
+plot_enet_coefs(fit_global_if_class_dist)
+```
+
+# Résultats sur l'ensemble test
+
+```{r}
+test_results <- tar_read(test_results)
+```
+
+```{r, include = F}
+dat <- 
+  test_results %>% 
+  reduce(bind_rows) %>% 
+  mutate(model = factor(names(test_results), levels = models_1)) %>% 
+  pivot_longer(cols = roc_auc:specificity, names_to = "metric") %>% 
+  filter(!(metric %in% c("mn_log_loss")))
+  
+min_accuracy <- dat %>% filter(metric == "accuracy") %>% pull(value) %>% min()
+min_f_meas <- dat %>% filter(metric == "f_meas") %>% pull(value) %>% min()
+min_roc_auc <- dat %>% filter(metric == "roc_auc") %>% pull(value) %>% min()
+min_sensitivity <- dat %>% filter(metric == "sensitivity") %>% pull(value) %>% min()
+min_specificity <- dat %>% filter(metric == "specificity") %>% pull(value) %>% min()
+
+y_vec <- rep(c(min_roc_auc, min_accuracy, min_f_meas, min_sensitivity, min_specificity), 7)
+
+```
+
+```{r}
+ggplot(dat, aes(x = model, y = value, col = model)) +
+  geom_point() +
+  geom_segment(aes(x = model, xend = model, y = y_vec, yend = value, color = model)) +
+  facet_grid(vars(metric), scales = "free") +
+  xlab(NULL) +
+  ylab(NULL) +
+  labs(subtitle = "Results on testing set") +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+```
+
+```{r}
+dat %>% 
+  pivot_wider(names_from = metric) %>% 
+  mutate(
+    roc_auc = round(roc_auc, 4),
+    accuracy = round(accuracy, 4),
+    f_meas = round(f_meas, 4),
+    sensitivity = round(sensitivity, 4),
+    specificity = round(specificity, 4),
+  ) %>% 
+  knitr::kable()
+```
+
+```{r}
+dat %>% 
+  pivot_wider(names_from = metric) %>% 
+  mutate(
+    roc_auc = round(roc_auc, 4),
+    accuracy = round(accuracy, 4),
+    f_meas = round(f_meas, 4),
+    sensitivity = round(sensitivity, 4),
+    specificity = round(specificity, 4),
+  ) %>% 
+  mutate(
+    roc_auc = roc_auc - first(roc_auc),
+    accuracy = accuracy - first(accuracy),
+    f_meas = f_meas - first(f_meas),
+    sensitivity = sensitivity - first(sensitivity),
+    specificity = specificity - first(specificity),
+  ) %>% 
+  knitr::kable()
+```
